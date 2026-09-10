@@ -35,7 +35,7 @@ struct SettingsView: View {
                         store.toggle(id: zone.id)
                     } label: {
                         Image(systemName: selected ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(selected ? .accentColor : .secondary)
+                            .foregroundStyle(selected ? Color.accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSelect)
