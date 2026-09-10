@@ -19,27 +19,37 @@ struct ContentView: View {
                         date: store.baseDate,
                         timeZone: zone.timeZone,
                         onDateChanged: { y, m, d in
-                            store.setDate(for: zone, year: y, month: m, day: d)
+                            DispatchQueue.main.async {
+                                store.setDate(for: zone, year: y, month: m, day: d)
+                            }
                         }
                     )
                     TimeWheelPicker(
                         hour: hm.h,
                         minute: hm.m,
                         onHourChanged: { newHour in
-                            // Re-read current minute at call time to avoid
-                            // stale capture overwriting a minute edit.
-                            let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
-                            store.setTime(for: zone, newHour: newHour, newMinute: cur.m)
+                            DispatchQueue.main.async {
+                                // Re-read current minute at call time to avoid
+                                // stale capture overwriting a minute edit.
+                                let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                                store.setTime(for: zone, newHour: newHour, newMinute: cur.m)
+                            }
                         },
                         onMinuteChanged: { newMinute in
-                            let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
-                            store.setTime(for: zone, newHour: cur.h, newMinute: newMinute)
+                            DispatchQueue.main.async {
+                                let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                                store.setTime(for: zone, newHour: cur.h, newMinute: newMinute)
+                            }
                         },
                         onHourStep: { delta in
-                            store.stepHour(for: zone, by: delta)
+                            DispatchQueue.main.async {
+                                store.stepHour(for: zone, by: delta)
+                            }
                         },
                         onMinuteStep: { delta in
-                            store.stepMinute30(for: zone, by: delta)
+                            DispatchQueue.main.async {
+                                store.stepMinute30(for: zone, by: delta)
+                            }
                         }
                     )
                     .layoutPriority(1)

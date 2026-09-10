@@ -40,19 +40,22 @@ struct TimeWheelPicker: View {
                 .help("Hour 0-23 (Up/Down to step 1h)")
                 .onSubmit { normalizeHour() }
                 .onKeyPress(.upArrow) {
-                    onHourStep(1)
+                    DispatchQueue.main.async { onHourStep(1) }
                     return .handled
                 }
                 .onKeyPress(.downArrow) {
-                    onHourStep(-1)
+                    DispatchQueue.main.async { onHourStep(-1) }
                     return .handled
                 }
                 .onChange(of: hourText) { _, newValue in
                     // Allow empty while typing, otherwise live-commit valid 0-23.
+                    // Deferred to avoid publishing TimeStore during view update.
                     let trimmed = newValue.trimmingCharacters(in: .whitespaces)
                     if trimmed.isEmpty { return }
                     if let v = Int(trimmed), (0..<24).contains(v) {
-                        if v != hour { onHourChanged(v) }
+                        if v != hour {
+                            DispatchQueue.main.async { onHourChanged(v) }
+                        }
                     }
                 }
 
@@ -78,18 +81,20 @@ struct TimeWheelPicker: View {
                 .help("Minute (Up/Down snaps to 0/30 then 30min steps)")
                 .onSubmit { normalizeMinute() }
                 .onKeyPress(.upArrow) {
-                    onMinuteStep(1)
+                    DispatchQueue.main.async { onMinuteStep(1) }
                     return .handled
                 }
                 .onKeyPress(.downArrow) {
-                    onMinuteStep(-1)
+                    DispatchQueue.main.async { onMinuteStep(-1) }
                     return .handled
                 }
                 .onChange(of: minuteText) { _, newValue in
                     let trimmed = newValue.trimmingCharacters(in: .whitespaces)
                     if trimmed.isEmpty { return }
                     if let v = Int(trimmed), (0..<60).contains(v) {
-                        if v != minute { onMinuteChanged(v) }
+                        if v != minute {
+                            DispatchQueue.main.async { onMinuteChanged(v) }
+                        }
                     }
                 }
         }

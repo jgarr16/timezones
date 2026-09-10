@@ -51,8 +51,11 @@ struct DateField: View {
                         let cur = currentYMD()
                         if v != cur.m {
                             // Only commit if current day exists in new month.
+                            // Deferred to avoid publishing TimeStore during view update.
                             if cur.d <= monthLength(year: cur.y, month: v) {
-                                onDateChanged(cur.y, v, cur.d)
+                                DispatchQueue.main.async {
+                                    onDateChanged(cur.y, v, cur.d)
+                                }
                             }
                         }
                     }
@@ -94,7 +97,9 @@ struct DateField: View {
                         let cur = currentYMD()
                         if v != cur.d {
                             if v <= monthLength(year: cur.y, month: cur.m) {
-                                onDateChanged(cur.y, cur.m, v)
+                                DispatchQueue.main.async {
+                                    onDateChanged(cur.y, cur.m, v)
+                                }
                             }
                         }
                     }
@@ -166,6 +171,14 @@ struct DateField: View {
         return r.count
     }
 
+    private func notifyDateChanged(y: Int, m: Int, d: Int) {
+        // Arrow steps originate from key press, but still defer to keep
+        // TimeStore publishing outside the current view update.
+        DispatchQueue.main.async {
+            onDateChanged(y, m, d)
+        }
+    }
+
     private func stepMonth(by delta: Int) {
         let cur = currentYMD()
         var newM = cur.m + delta
@@ -183,7 +196,7 @@ struct DateField: View {
         if newD != cur.d {
             dayText = "\(newD)"
         }
-        onDateChanged(newY, newM, newD)
+        notifyDateChanged(y: newY, m: newM, d: newD)
     }
 
     private func stepDay(by delta: Int) {
@@ -196,7 +209,7 @@ struct DateField: View {
             let newD = c.day ?? cur.d
             monthText = "\(newM)"
             dayText = "\(newD)"
-            onDateChanged(newY, newM, newD)
+            notifyDateChanged(y: newY, m: newM, d: newD)
         }
     }
 
