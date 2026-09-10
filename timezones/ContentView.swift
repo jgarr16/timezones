@@ -19,10 +19,14 @@ struct ContentView: View {
                         hour: hm.h,
                         minute: hm.m,
                         onHourChanged: { newHour in
-                            store.setTime(for: zone, newHour: newHour, newMinute: hm.m)
+                            // Re-read current minute at call time to avoid
+                            // stale capture overwriting a minute edit.
+                            let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                            store.setTime(for: zone, newHour: newHour, newMinute: cur.m)
                         },
                         onMinuteChanged: { newMinute in
-                            store.setTime(for: zone, newHour: hm.h, newMinute: newMinute)
+                            let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                            store.setTime(for: zone, newHour: cur.h, newMinute: newMinute)
                         }
                     )
                     .layoutPriority(1)
@@ -43,6 +47,7 @@ struct ContentView: View {
                     .fill(store.isLive ? Color.green : Color.gray)
                     .frame(width: 6, height: 6)
                 Button(store.isLive ? "Pause" : "Now") {
+                    clearFocus()
                     if store.isLive {
                         store.pause()
                     } else {
@@ -69,5 +74,11 @@ struct ContentView: View {
         }
         .padding(10)
         .frame(width: 280)
+    }
+
+    private func clearFocus() {
+        // MenuBarExtra window keeps TextField focus otherwise,
+        // which blocks sync and leaves stale minutes visible.
+        NSApplication.shared.keyWindow?.makeFirstResponder(nil)
     }
 }
