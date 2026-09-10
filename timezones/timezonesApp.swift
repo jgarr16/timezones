@@ -3,34 +3,21 @@ import AppKit
 
 @main
 struct timezonesApp: App {
+    @StateObject private var store = TimeStore()
+
     var body: some Scene {
+        MenuBarExtra {
+            ContentView(store: store)
+        } label: {
+            Text(store.localHHmm)
+                .font(.system(size: 13).monospacedDigit())
+        }
+        .menuBarExtraStyle(.window)
+
         Window("Timezones", id: "main") {
-            ContentView()
-                .frame(minWidth: 760, minHeight: 520)
+            ContentView(store: store)
+                .frame(minWidth: 250, minHeight: 180)
         }
         .windowResizability(.contentSize)
-
-        MenuBarExtra("Timezones", systemImage: "clock") {
-            MenuBarView()
-        }
-    }
-}
-
-struct MenuBarView: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Open Timezones") {
-            openWindow(id: "main")
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        .keyboardShortcut("o")
-
-        Divider()
-
-        Button("Quit Timezones") {
-            NSApplication.shared.terminate(nil)
-        }
-        .keyboardShortcut("q")
     }
 }
