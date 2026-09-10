@@ -41,6 +41,7 @@ struct ZoneDef: Identifiable, Hashable {
 
 final class TimeStore: ObservableObject {
     @Published var baseDate: Date = Date()
+    @Published var liveNow: Date = Date()
     @Published var isLive: Bool = true
     @Published var extraIDs: [String] {
         didSet {
@@ -93,6 +94,8 @@ final class TimeStore: ObservableObject {
             .autoconnect()
             .sink { [weak self] now in
                 guard let self else { return }
+                // Always-live clock for menu bar, independent of edits.
+                self.liveNow = now
                 if self.isLive {
                     self.baseDate = now
                 }
@@ -100,7 +103,13 @@ final class TimeStore: ObservableObject {
     }
 
     var localHHmm: String {
-        hhmm(for: baseDate, in: localDef.timeZone)
+        hhmm(for: liveNow, in: localDef.timeZone)
+    }
+
+    var menuBarText: String {
+        let ymd = yearMonthDay(for: liveNow, in: localDef.timeZone)
+        let hm = hhmm(for: liveNow, in: localDef.timeZone)
+        return "\(ymd.m)/\(ymd.d) \(hm)"
     }
 
     func isSelected(id: String) -> Bool {

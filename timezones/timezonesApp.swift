@@ -9,7 +9,7 @@ struct timezonesApp: App {
         MenuBarExtra {
             ContentView(store: store)
         } label: {
-            Text(store.localHHmm)
+            Text(store.menuBarText)
                 .font(.system(size: 13).monospacedDigit())
         }
         .menuBarExtraStyle(.window)
