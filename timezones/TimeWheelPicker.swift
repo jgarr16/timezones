@@ -20,10 +20,19 @@ struct TimeWheelPicker: View {
         HStack(spacing: 2) {
             TextField("", text: $hourText)
                 .focused($focusedField, equals: .hour)
-                .frame(width: 26)
-                .multilineTextAlignment(.trailing)
+                .frame(width: 32)
+                .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13).monospacedDigit())
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(focusedField == .hour ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                        )
+                )
                 .onSubmit { commitHour() }
                 .onChange(of: focusedField) { _, newValue in
                     if newValue == nil {
@@ -38,10 +47,19 @@ struct TimeWheelPicker: View {
 
             TextField("", text: $minuteText)
                 .focused($focusedField, equals: .minute)
-                .frame(width: 26)
-                .multilineTextAlignment(.leading)
+                .frame(width: 32)
+                .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13).monospacedDigit())
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(focusedField == .minute ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                        )
+                )
                 .onSubmit { commitMinute() }
         }
         .onAppear {

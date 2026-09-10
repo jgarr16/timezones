@@ -16,7 +16,13 @@ struct timezonesApp: App {
 
         Window("Timezones", id: "main") {
             ContentView(store: store)
-                .frame(minWidth: 250, minHeight: 180)
+                .frame(minWidth: 300, minHeight: 200)
+        }
+        .windowResizability(.contentSize)
+
+        Window("Settings", id: "settings") {
+            SettingsView(store: store)
+                .frame(minWidth: 280, minHeight: 320)
         }
         .windowResizability(.contentSize)
     }

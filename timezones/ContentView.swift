@@ -1,7 +1,9 @@
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @ObservedObject var store: TimeStore
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 6) {
@@ -10,8 +12,9 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     Text(zone.title)
                         .font(.system(size: 13))
-                        .frame(width: 56, alignment: .leading)
-                    Spacer()
+                        .frame(width: 64, alignment: .leading)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
                     TimeWheelPicker(
                         hour: hm.h,
                         minute: hm.m,
@@ -22,13 +25,15 @@ struct ContentView: View {
                             store.setTime(for: zone, newHour: hm.h, newMinute: newMinute)
                         }
                     )
+                    .layoutPriority(1)
                     Text(zone.abbreviation(for: store.baseDate))
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 34, alignment: .trailing)
+                        .frame(width: 44, alignment: .trailing)
+                        .lineLimit(1)
                 }
                 .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.vertical, 5)
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
@@ -47,6 +52,12 @@ struct ContentView: View {
                 .buttonStyle(.link)
                 .font(.system(size: 11))
                 Spacer()
+                Button("Settings") {
+                    openWindow(id: "settings")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
                 }
@@ -57,6 +68,6 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .frame(width: 230)
+        .frame(width: 280)
     }
 }
