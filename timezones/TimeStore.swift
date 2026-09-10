@@ -8,7 +8,18 @@ struct ZoneDef: Identifiable, Hashable {
 
     func abbreviation(for date: Date) -> String {
         if id == "zulu" { return "GMT" }
-        return timeZone.abbreviation(for: date) ?? ""
+        if id == "seoul" { return "KST" }
+        if id == "tokyo" { return "JST" }
+        if id == "dubai" { return "GST" }
+        if id == "honolulu" { return "HST" }
+        let abbr = timeZone.abbreviation(for: date) ?? ""
+        // macOS returns GMT+X for some Asian zones, prefer common names.
+        if abbr.hasPrefix("GMT+") || abbr.hasPrefix("GMT-") {
+            if id == "paris" { return "CET" }
+            if id == "sydney" { return "AET" }
+            if id == "auckland" { return "NZT" }
+        }
+        return abbr
     }
 }
 
@@ -36,6 +47,7 @@ final class TimeStore: ObservableObject {
         ZoneDef(id: "london", title: "London", timeZone: TimeZone(identifier: "Europe/London") ?? TimeZone.current),
         ZoneDef(id: "paris", title: "Paris", timeZone: TimeZone(identifier: "Europe/Paris") ?? TimeZone.current),
         ZoneDef(id: "dubai", title: "Dubai", timeZone: TimeZone(identifier: "Asia/Dubai") ?? TimeZone.current),
+        ZoneDef(id: "seoul", title: "Seoul", timeZone: TimeZone(identifier: "Asia/Seoul") ?? TimeZone.current),
         ZoneDef(id: "tokyo", title: "Tokyo", timeZone: TimeZone(identifier: "Asia/Tokyo") ?? TimeZone.current),
         ZoneDef(id: "sydney", title: "Sydney", timeZone: TimeZone(identifier: "Australia/Sydney") ?? TimeZone.current),
         ZoneDef(id: "auckland", title: "Auckland", timeZone: TimeZone(identifier: "Pacific/Auckland") ?? TimeZone.current)

@@ -1,101 +1,178 @@
 import SwiftUI
 
-// Compact editable date M/d/yy shown in a specific time zone.
+// Two separate blocks: M and D, no leading zeros, no year display.
+// Year is preserved from the current date in this zone.
 // Single component for all date inputs, mirrors TimeWheelPicker.
 struct DateField: View {
     let date: Date
     let timeZone: TimeZone
     let onDateChanged: (Int, Int, Int) -> Void
 
-    @State private var text: String = ""
-    @FocusState private var isFocused: Bool
+    @State private var monthText: String = ""
+    @State private var dayText: String = ""
+    @FocusState private var focusedField: Field?
 
-    var body: some View {
-        TextField("", text: $text)
-            .focused($isFocused)
-            .frame(width: 64)
-            .multilineTextAlignment(.center)
-            .textFieldStyle(.plain)
-            .font(.system(size: 12).monospacedDigit())
-            .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(Color(nsColor: .textBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(isFocused ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
-                    )
-            )
-            .help("Date M/d/yy in this zone")
-            .onAppear {
-                syncFromProps()
-            }
-            .onChange(of: date) { _, _ in
-                if !isFocused {
-                    syncFromProps()
-                }
-            }
-            .onChange(of: timeZone.identifier) { _, _ in
-                syncFromProps()
-            }
-            .onSubmit {
-                commit()
-            }
-            .onChange(of: isFocused) { _, focused in
-                if !focused {
-                    commit()
-                }
-            }
+    private enum Field: Hashable {
+        case month, day
     }
 
-    private func formatter() -> DateFormatter {
-        let f = DateFormatter()
-        f.timeZone = timeZone
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "M/d/yy"
-        return f
+    var body: some View {
+        HStack(spacing: 2) {
+            TextField("", text: $monthText)
+                .focused($focusedField, equals: .month)
+                .frame(width: 28)
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12).monospacedDigit())
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(focusedField == .month ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                        )
+                )
+                .help("Month in this zone")
+                .onSubmit { normalizeMonth() }
+                .onChange(of: monthText) { _, newValue in
+                    let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                    if trimmed.isEmpty { return }
+                    if let v = Int(trimmed), (1...12).contains(v) {
+                        let cur = currentYMD()
+                        if v != cur.m {
+                            // Only commit if current day exists in new month.
+                            if cur.d <= monthLength(year: cur.y, month: v) {
+                                onDateChanged(cur.y, v, cur.d)
+                            }
+                        }
+                    }
+                }
+
+            Text("/")
+                .font(.system(size: 12).monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            TextField("", text: $dayText)
+                .focused($focusedField, equals: .day)
+                .frame(width: 28)
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12).monospacedDigit())
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(focusedField == .day ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                        )
+                )
+                .help("Day in this zone")
+                .onSubmit { normalizeDay() }
+                .onChange(of: dayText) { _, newValue in
+                    let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                    if trimmed.isEmpty { return }
+                    if let v = Int(trimmed), (1...31).contains(v) {
+                        let cur = currentYMD()
+                        if v != cur.d {
+                            if v <= monthLength(year: cur.y, month: cur.m) {
+                                onDateChanged(cur.y, cur.m, v)
+                            }
+                        }
+                    }
+                }
+        }
+        .onAppear {
+            syncFromProps()
+        }
+        .onChange(of: date) { _, _ in
+            if focusedField == nil {
+                syncFromProps()
+            } else if focusedField == .month {
+                // Keep editing month, but refresh day block live.
+                let cur = currentYMD()
+                dayText = "\(cur.d)"
+            } else if focusedField == .day {
+                let cur = currentYMD()
+                monthText = "\(cur.m)"
+            }
+        }
+        .onChange(of: timeZone.identifier) { _, _ in
+            syncFromProps()
+        }
+        .onChange(of: focusedField) { oldValue, newValue in
+            if oldValue == .month && newValue != .month {
+                normalizeMonth()
+            }
+            if oldValue == .day && newValue != .day {
+                normalizeDay()
+            }
+            if newValue == nil {
+                syncFromProps()
+            }
+        }
+    }
+
+    private func calendar() -> Calendar {
+        var cal = Calendar.current
+        cal.timeZone = timeZone
+        return cal
+    }
+
+    private func currentYMD() -> (y: Int, m: Int, d: Int) {
+        let cal = calendar()
+        let c = cal.dateComponents([.year, .month, .day], from: date)
+        return (c.year ?? 2000, c.month ?? 1, c.day ?? 1)
+    }
+
+    private func monthLength(year: Int, month: Int) -> Int {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = 1
+        guard let d = cal.date(from: comps),
+              let r = cal.range(of: .day, in: .month, for: d) else {
+            return 31
+        }
+        return r.count
     }
 
     private func syncFromProps() {
-        text = formatter().string(from: date)
-    }
-
-    private func commit() {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let (y, m, d) = parse(trimmed) {
-            onDateChanged(y, m, d)
-            // Re-format to normalized form after store updates.
-            // Fall back to immediate format in case store rejects.
-            let cal = Calendar.current
-            var c = cal.dateComponents([.year, .month, .day], from: date)
-            _ = c
-            text = "\(m)/\(d)/\(String(format: "%02d", y % 100))"
-        } else {
-            syncFromProps()
+        let cur = currentYMD()
+        if focusedField != .month {
+            monthText = "\(cur.m)"
+        }
+        if focusedField != .day {
+            dayText = "\(cur.d)"
+        }
+        if focusedField == nil {
+            monthText = "\(cur.m)"
+            dayText = "\(cur.d)"
         }
     }
 
-    private func parse(_ s: String) -> (Int, Int, Int)? {
-        // Accept M/d/yy, M/d/yyyy, M-d-yy, M.d.yy, or M/d (year = current year in zone).
-        let separators = CharacterSet(charactersIn: "/-. ")
-        let parts = s.components(separatedBy: separators).filter { !$0.isEmpty }
-        guard parts.count == 2 || parts.count == 3 else { return nil }
-        guard let m = Int(parts[0]), let d = Int(parts[1]) else { return nil }
-        guard (1...12).contains(m), (1...31).contains(d) else { return nil }
-
-        let y: Int
-        if parts.count == 3 {
-            guard let rawY = Int(parts[2]) else { return nil }
-            if rawY < 100 {
-                y = 2000 + rawY
-            } else {
-                y = rawY
-            }
+    private func normalizeMonth() {
+        let cur = currentYMD()
+        let trimmed = monthText.trimmingCharacters(in: .whitespaces)
+        if let v = Int(trimmed), (1...12).contains(v),
+           cur.d <= monthLength(year: cur.y, month: v) {
+            monthText = "\(v)"
         } else {
-            var cal = Calendar.current
-            cal.timeZone = timeZone
-            y = cal.component(.year, from: date)
+            monthText = "\(cur.m)"
         }
-        return (y, m, d)
+    }
+
+    private func normalizeDay() {
+        let cur = currentYMD()
+        let trimmed = dayText.trimmingCharacters(in: .whitespaces)
+        if let v = Int(trimmed), (1...31).contains(v),
+           v <= monthLength(year: cur.y, month: cur.m) {
+            dayText = "\(v)"
+        } else {
+            dayText = "\(cur.d)"
+        }
     }
 }
