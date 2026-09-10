@@ -8,7 +8,7 @@ struct SettingsView: View {
             Text("Time Zones")
                 .font(.system(size: 14, weight: .semibold))
 
-            Text("Local is always shown. Add up to \(TimeStore.maxExtras) more (\(store.extraIDs.count)/\(TimeStore.maxExtras)).")
+            Text("KST is always shown. Add up to \(TimeStore.maxExtras) more (\(store.extraIDs.count)/\(TimeStore.maxExtras)).")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
@@ -17,7 +17,7 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.secondary)
-                Text("Local")
+                Text("KST")
                     .font(.system(size: 13))
                 Spacer()
                 Text("Always on")

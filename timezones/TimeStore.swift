@@ -8,6 +8,7 @@ struct ZoneDef: Identifiable, Hashable {
     let timeZone: TimeZone
 
     func abbreviation(for date: Date) -> String {
+        if id == "local" { return "KST" }
         if id == "zulu" { return "GMT" }
         if id == "seoul" { return "KST" }
         if id == "tokyo" { return "JST" }
@@ -71,7 +72,7 @@ final class TimeStore: ObservableObject {
     static let defaultExtras = ["zulu", "central"]
 
     var localDef: ZoneDef {
-        ZoneDef(id: "local", title: "Local", timeZone: TimeZone.autoupdatingCurrent)
+        ZoneDef(id: "local", title: "KST", timeZone: TimeZone.autoupdatingCurrent)
     }
 
     var zones: [ZoneDef] {
@@ -256,7 +257,7 @@ final class TimeStore: ObservableObject {
 
     func displayName(for zone: ZoneDef) -> String {
         if zone.id == "zulu" { return "GMT" }
-        if zone.id == "local" { return "Local Time" }
+        if zone.id == "local" { return "KST" }
         return "\(zone.title) Time"
     }
 
@@ -271,11 +272,12 @@ final class TimeStore: ObservableObject {
     func copyLine(for zone: ZoneDef) -> String {
         let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
         let t = twelveHour(for: baseDate, in: zone.timeZone)
-        return "\(displayName(for: zone)) \(ymd.m)/\(ymd.d) \(t)"
+        let abbr = zone.abbreviation(for: baseDate)
+        return "\(ymd.m)/\(ymd.d) \(t) (\(abbr))"
     }
 
     func copySentence(for zone: ZoneDef) -> String {
-        return "Here's the \(displayName(for: zone)): \(copyLine(for: zone))"
+        return copyLine(for: zone)
     }
 
     var clipboardText: String {
