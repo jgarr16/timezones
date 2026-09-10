@@ -175,6 +175,85 @@ final class TimeStore: ObservableObject {
         isLive = false
     }
 
+    func stepHour(for zone: ZoneDef, by delta: Int) {
+        let cal = calendar(for: zone.timeZone)
+        if let newDate = cal.date(byAdding: .hour, value: delta, to: baseDate) {
+            baseDate = newDate
+        }
+        isLive = false
+    }
+
+    func stepMinute30(for zone: ZoneDef, by delta: Int) {
+        let cal = calendar(for: zone.timeZone)
+        let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
+        let hm = hourMinute(for: baseDate, in: zone.timeZone)
+        var newH = hm.h
+        var newM = hm.m
+        var dayOffset = 0
+        if delta > 0 {
+            if hm.m % 30 == 0 {
+                let total = hm.h * 60 + hm.m + 30
+                if total >= 24 * 60 {
+                    newH = 0
+                    newM = 0
+                    dayOffset = 1
+                } else {
+                    newH = total / 60
+                    newM = total % 60
+                }
+            } else if hm.m < 30 {
+                newH = hm.h
+                newM = 30
+            } else {
+                // 31...59 -> next hour 00
+                if hm.h == 23 {
+                    newH = 0
+                    newM = 0
+                    dayOffset = 1
+                } else {
+                    newH = hm.h + 1
+                    newM = 0
+                }
+            }
+        } else {
+            if hm.m % 30 == 0 {
+                let total = hm.h * 60 + hm.m - 30
+                if total < 0 {
+                    newH = 23
+                    newM = 30
+                    dayOffset = -1
+                } else {
+                    newH = total / 60
+                    newM = total % 60
+                }
+            } else if hm.m > 30 {
+                newH = hm.h
+                newM = 30
+            } else {
+                // 1...29 -> :00 same hour
+                newH = hm.h
+                newM = 0
+            }
+        }
+        var comps = DateComponents()
+        comps.year = ymd.y
+        comps.month = ymd.m
+        comps.day = ymd.d
+        comps.hour = newH
+        comps.minute = newM
+        comps.second = 0
+        comps.nanosecond = 0
+        guard let baseInZone = cal.date(from: comps) else { return }
+        var finalDate = baseInZone
+        if dayOffset != 0 {
+            if let shifted = cal.date(byAdding: .day, value: dayOffset, to: baseInZone) {
+                finalDate = shifted
+            }
+        }
+        baseDate = finalDate
+        isLive = false
+    }
+
     func displayName(for zone: ZoneDef) -> String {
         if zone.id == "zulu" { return "GMT" }
         if zone.id == "local" { return "Local Time" }

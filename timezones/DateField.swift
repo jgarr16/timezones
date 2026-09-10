@@ -3,6 +3,7 @@ import SwiftUI
 // Two separate blocks: M and D, no leading zeros, no year display.
 // Year is preserved from the current date in this zone.
 // Single component for all date inputs, mirrors TimeWheelPicker.
+// Up/Down arrows step month/day.
 struct DateField: View {
     let date: Date
     let timeZone: TimeZone
@@ -33,8 +34,16 @@ struct DateField: View {
                                 .stroke(focusedField == .month ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
                         )
                 )
-                .help("Month in this zone")
+                .help("Month in this zone (Up/Down to step)")
                 .onSubmit { normalizeMonth() }
+                .onKeyPress(.upArrow) {
+                    stepMonth(by: 1)
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    stepMonth(by: -1)
+                    return .handled
+                }
                 .onChange(of: monthText) { _, newValue in
                     let trimmed = newValue.trimmingCharacters(in: .whitespaces)
                     if trimmed.isEmpty { return }
@@ -68,8 +77,16 @@ struct DateField: View {
                                 .stroke(focusedField == .day ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
                         )
                 )
-                .help("Day in this zone")
+                .help("Day in this zone (Up/Down to step)")
                 .onSubmit { normalizeDay() }
+                .onKeyPress(.upArrow) {
+                    stepDay(by: 1)
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    stepDay(by: -1)
+                    return .handled
+                }
                 .onChange(of: dayText) { _, newValue in
                     let trimmed = newValue.trimmingCharacters(in: .whitespaces)
                     if trimmed.isEmpty { return }
@@ -87,15 +104,24 @@ struct DateField: View {
             syncFromProps()
         }
         .onChange(of: date) { _, _ in
+            let cur = currentYMD()
             if focusedField == nil {
                 syncFromProps()
             } else if focusedField == .month {
-                // Keep editing month, but refresh day block live.
-                let cur = currentYMD()
+                // Other block always refreshes.
                 dayText = "\(cur.d)"
+                // Focused block only refreshes if stale valid entry (arrow step from another zone).
+                // Leave invalid/empty alone so typing 0 -> 09 is not clobbered.
+                let trimmed = monthText.trimmingCharacters(in: .whitespaces)
+                if let v = Int(trimmed), (1...12).contains(v), v != cur.m {
+                    monthText = "\(cur.m)"
+                }
             } else if focusedField == .day {
-                let cur = currentYMD()
                 monthText = "\(cur.m)"
+                let trimmed = dayText.trimmingCharacters(in: .whitespaces)
+                if let v = Int(trimmed), (1...31).contains(v), v != cur.d {
+                    dayText = "\(cur.d)"
+                }
             }
         }
         .onChange(of: timeZone.identifier) { _, _ in
@@ -138,6 +164,40 @@ struct DateField: View {
             return 31
         }
         return r.count
+    }
+
+    private func stepMonth(by delta: Int) {
+        let cur = currentYMD()
+        var newM = cur.m + delta
+        var newY = cur.y
+        while newM < 1 {
+            newM += 12
+            newY -= 1
+        }
+        while newM > 12 {
+            newM -= 12
+            newY += 1
+        }
+        let newD = min(cur.d, monthLength(year: newY, month: newM))
+        monthText = "\(newM)"
+        if newD != cur.d {
+            dayText = "\(newD)"
+        }
+        onDateChanged(newY, newM, newD)
+    }
+
+    private func stepDay(by delta: Int) {
+        let cal = calendar()
+        let cur = currentYMD()
+        if let shifted = cal.date(byAdding: .day, value: delta, to: date) {
+            let c = cal.dateComponents([.year, .month, .day], from: shifted)
+            let newY = c.year ?? cur.y
+            let newM = c.month ?? cur.m
+            let newD = c.day ?? cur.d
+            monthText = "\(newM)"
+            dayText = "\(newD)"
+            onDateChanged(newY, newM, newD)
+        }
     }
 
     private func syncFromProps() {

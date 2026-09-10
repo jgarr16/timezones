@@ -3,11 +3,14 @@ import SwiftUI
 // Compact bare-bones HH:mm entry. Kept under the same name so all
 // time inputs still go through one component.
 // Live-commit version: valid typing immediately syncs bidirectional state.
+// Up/Down arrows: hour steps 1h, minute snaps to 0/30 in direction then 30min steps.
 struct TimeWheelPicker: View {
     let hour: Int
     let minute: Int
     let onHourChanged: (Int) -> Void
     let onMinuteChanged: (Int) -> Void
+    var onHourStep: (Int) -> Void = { _ in }
+    var onMinuteStep: (Int) -> Void = { _ in }
 
     @State private var hourText: String = ""
     @State private var minuteText: String = ""
@@ -34,7 +37,16 @@ struct TimeWheelPicker: View {
                                 .stroke(focusedField == .hour ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
                         )
                 )
+                .help("Hour 0-23 (Up/Down to step 1h)")
                 .onSubmit { normalizeHour() }
+                .onKeyPress(.upArrow) {
+                    onHourStep(1)
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    onHourStep(-1)
+                    return .handled
+                }
                 .onChange(of: hourText) { _, newValue in
                     // Allow empty while typing, otherwise live-commit valid 0-23.
                     let trimmed = newValue.trimmingCharacters(in: .whitespaces)
@@ -63,7 +75,16 @@ struct TimeWheelPicker: View {
                                 .stroke(focusedField == .minute ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
                         )
                 )
+                .help("Minute (Up/Down snaps to 0/30 then 30min steps)")
                 .onSubmit { normalizeMinute() }
+                .onKeyPress(.upArrow) {
+                    onMinuteStep(1)
+                    return .handled
+                }
+                .onKeyPress(.downArrow) {
+                    onMinuteStep(-1)
+                    return .handled
+                }
                 .onChange(of: minuteText) { _, newValue in
                     let trimmed = newValue.trimmingCharacters(in: .whitespaces)
                     if trimmed.isEmpty { return }
@@ -76,15 +97,25 @@ struct TimeWheelPicker: View {
             syncFromProps()
         }
         .onChange(of: hour) { _, newHour in
-            // Only overwrite hour field if user is not editing it.
-            // This lets other zones update live while typing here.
             if focusedField != .hour {
                 hourText = String(format: "%02d", newHour)
+            } else {
+                // Focused: only refresh if stale valid entry (arrow step).
+                // Leave empty/invalid alone for typing.
+                let trimmed = hourText.trimmingCharacters(in: .whitespaces)
+                if let v = Int(trimmed), (0..<24).contains(v), v != newHour {
+                    hourText = String(format: "%02d", newHour)
+                }
             }
         }
         .onChange(of: minute) { _, newMinute in
             if focusedField != .minute {
                 minuteText = String(format: "%02d", newMinute)
+            } else {
+                let trimmed = minuteText.trimmingCharacters(in: .whitespaces)
+                if let v = Int(trimmed), (0..<60).contains(v), v != newMinute {
+                    minuteText = String(format: "%02d", newMinute)
+                }
             }
         }
         .onChange(of: focusedField) { oldValue, newValue in

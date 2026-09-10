@@ -34,6 +34,12 @@ struct ContentView: View {
                         onMinuteChanged: { newMinute in
                             let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
                             store.setTime(for: zone, newHour: cur.h, newMinute: newMinute)
+                        },
+                        onHourStep: { delta in
+                            store.stepHour(for: zone, by: delta)
+                        },
+                        onMinuteStep: { delta in
+                            store.stepMinute30(for: zone, by: delta)
                         }
                     )
                     .layoutPriority(1)
