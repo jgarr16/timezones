@@ -21,6 +21,20 @@ struct ZoneDef: Identifiable, Hashable {
         }
         return abbr
     }
+
+    func gmtOffsetString(for date: Date) -> String {
+        let seconds = timeZone.secondsFromGMT(for: date)
+        let totalMinutes = seconds / 60
+        let sign = totalMinutes >= 0 ? "+" : "-"
+        let absMinutes = abs(totalMinutes)
+        let hours = absMinutes / 60
+        let mins = absMinutes % 60
+        if mins == 0 {
+            return "\(sign)\(hours)"
+        } else {
+            return String(format: "%@%d:%02d", sign, hours, mins)
+        }
+    }
 }
 
 final class TimeStore: ObservableObject {

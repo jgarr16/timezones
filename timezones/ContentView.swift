@@ -36,10 +36,10 @@ struct ContentView: View {
                         }
                     )
                     .layoutPriority(1)
-                    Text(zone.abbreviation(for: store.baseDate))
+                    Text(zone.gmtOffsetString(for: store.baseDate))
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .trailing)
+                        .frame(width: 40, alignment: .trailing)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 8)
