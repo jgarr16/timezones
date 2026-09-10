@@ -78,20 +78,15 @@ struct ContentView: View {
             }
 
             HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(store.isLive ? Color.green : Color.gray)
-                        .frame(width: 6, height: 6)
-                    Button("Reset") {
-                        clearFocus()
-                        store.goLive()
-                    }
-                    .buttonStyle(.link)
-                    .font(.system(size: 11))
-                    .frame(width: 36, alignment: .leading)
-                    .opacity(store.isLive ? 0 : 1)
-                    .disabled(store.isLive)
+                Button("Reset") {
+                    clearFocus()
+                    store.goLive()
                 }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+                .frame(width: 36, alignment: .leading)
+                .opacity(store.isLive ? 0 : 1)
+                .disabled(store.isLive)
                 .frame(width: 60, alignment: .leading)
                 Spacer()
                 Button(didCopy ? "Copied!" : "Copy All") {
@@ -103,22 +98,14 @@ struct ContentView: View {
                 .keyboardShortcut("m", modifiers: .command)
                 .help("Copy all rows as friendly text, one per line (Cmd+M)")
                 Spacer()
-                HStack(spacing: 8) {
-                    Button("Settings") {
-                        openWindow(id: "settings")
-                        NSApp.activate(ignoringOtherApps: true)
-                    }
-                    .buttonStyle(.link)
-                    .font(.system(size: 11))
-                    .frame(width: 50)
-                    Button("Quit") {
-                        NSApplication.shared.terminate(nil)
-                    }
-                    .buttonStyle(.link)
-                    .font(.system(size: 11))
-                    .frame(width: 28)
+                Button("Settings") {
+                    openWindow(id: "settings")
+                    NSApp.activate(ignoringOtherApps: true)
                 }
-                .frame(width: 94, alignment: .trailing)
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+                .frame(width: 50, alignment: .trailing)
+                .frame(width: 60, alignment: .trailing)
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)

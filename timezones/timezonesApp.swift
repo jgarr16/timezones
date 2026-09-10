@@ -9,8 +9,7 @@ struct timezonesApp: App {
         MenuBarExtra {
             ContentView(store: store)
         } label: {
-            Text(store.menuBarText)
-                .font(.system(size: 13).monospacedDigit())
+            MenuBarLabelView(store: store)
         }
         .menuBarExtraStyle(.window)
 
@@ -25,5 +24,25 @@ struct timezonesApp: App {
                 .frame(minWidth: 280, minHeight: 320)
         }
         .windowResizability(.contentSize)
+    }
+}
+
+struct MenuBarLabelView: View {
+    @ObservedObject var store: TimeStore
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Text(store.menuBarText)
+            .font(.system(size: 13).monospacedDigit())
+            .contextMenu {
+                Button("Settings...") {
+                    openWindow(id: "settings")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+                Divider()
+                Button("Quit Timezones") {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
     }
 }
