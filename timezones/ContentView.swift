@@ -52,7 +52,7 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("Copy this row (Title M/D HH:mm)")
+                    .help("Copy this row as friendly text")
                     .frame(width: 18)
                 }
                 .padding(.horizontal, 8)
@@ -82,7 +82,7 @@ struct ContentView: View {
                 .buttonStyle(.link)
                 .font(.system(size: 11))
                 .keyboardShortcut("m", modifiers: .command)
-                .help("Copy all rows, one per line (Cmd+M)")
+                .help("Copy all rows as friendly text, one per line (Cmd+M)")
                 Spacer()
                 Button("Settings") {
                     openWindow(id: "settings")

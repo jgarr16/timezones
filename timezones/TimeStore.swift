@@ -175,15 +175,32 @@ final class TimeStore: ObservableObject {
         isLive = false
     }
 
+    func displayName(for zone: ZoneDef) -> String {
+        if zone.id == "zulu" { return "GMT" }
+        if zone.id == "local" { return "Local Time" }
+        return "\(zone.title) Time"
+    }
+
+    func twelveHour(for date: Date, in timeZone: TimeZone) -> String {
+        let f = DateFormatter()
+        f.timeZone = timeZone
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "h:mm a"
+        return f.string(from: date).lowercased()
+    }
+
     func copyLine(for zone: ZoneDef) -> String {
         let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
-        let hm = hourMinute(for: baseDate, in: zone.timeZone)
-        let offset = zone.gmtOffsetString(for: baseDate)
-        return String(format: "%@ %d/%d %02d:%02d (%@)", zone.title, ymd.m, ymd.d, hm.h, hm.m, offset)
+        let t = twelveHour(for: baseDate, in: zone.timeZone)
+        return "\(displayName(for: zone)) \(ymd.m)/\(ymd.d) \(t)"
+    }
+
+    func copySentence(for zone: ZoneDef) -> String {
+        return "Here's the \(displayName(for: zone)): \(copyLine(for: zone))"
     }
 
     var clipboardText: String {
-        zones.map { copyLine(for: $0) }.joined(separator: "\n")
+        zones.map { copySentence(for: $0) }.joined(separator: "\n")
     }
 
     func copyAllToClipboard() {
@@ -195,7 +212,7 @@ final class TimeStore: ObservableObject {
     func copySingleToClipboard(zone: ZoneDef) {
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(copyLine(for: zone), forType: .string)
+        pb.setString(copySentence(for: zone), forType: .string)
     }
 
     func goLive() {
