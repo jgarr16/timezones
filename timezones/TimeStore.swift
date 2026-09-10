@@ -40,15 +40,16 @@ struct ZoneDef: Identifiable, Hashable {
 }
 
 final class TimeStore: ObservableObject {
-    @Published var baseDate: Date = Date()
-    @Published var liveNow: Date = Date()
-    @Published var isLive: Bool = true
+    @Published var baseDate: Date
+    @Published var liveNow: Date
+    @Published var isLive: Bool
     @Published var extraIDs: [String] {
         didSet {
-            UserDefaults.standard.set(extraIDs, forKey: Self.storageKey)
+            userDefaults.set(extraIDs, forKey: Self.storageKey)
         }
     }
 
+    private var userDefaults: UserDefaults
     private var timerCancellable: AnyCancellable?
 
     static let storageKey = "extraZoneIDs"
@@ -83,23 +84,41 @@ final class TimeStore: ObservableObject {
         return [localDef] + extras
     }
 
-    init() {
-        let saved = UserDefaults.standard.stringArray(forKey: Self.storageKey)
-        if let saved, !saved.isEmpty {
-            self.extraIDs = Array(saved.prefix(Self.maxExtras))
+    init(
+        baseDate: Date = Date(),
+        liveNow: Date? = nil,
+        isLive: Bool = true,
+        extraIDs: [String]? = nil,
+        userDefaults: UserDefaults = .standard,
+        enableTimer: Bool = true
+    ) {
+        self.userDefaults = userDefaults
+        let initialBase = baseDate
+        self.baseDate = initialBase
+        self.liveNow = liveNow ?? initialBase
+        self.isLive = isLive
+        if let extraIDs {
+            self.extraIDs = Array(extraIDs.prefix(Self.maxExtras))
         } else {
-            self.extraIDs = Self.defaultExtras
-        }
-        timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] now in
-                guard let self else { return }
-                // Always-live clock for menu bar, independent of edits.
-                self.liveNow = now
-                if self.isLive {
-                    self.baseDate = now
-                }
+            let saved = userDefaults.stringArray(forKey: Self.storageKey)
+            if let saved, !saved.isEmpty {
+                self.extraIDs = Array(saved.prefix(Self.maxExtras))
+            } else {
+                self.extraIDs = Self.defaultExtras
             }
+        }
+        if enableTimer {
+            timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
+                .autoconnect()
+                .sink { [weak self] now in
+                    guard let self else { return }
+                    // Always-live clock for menu bar, independent of edits.
+                    self.liveNow = now
+                    if self.isLive {
+                        self.baseDate = now
+                    }
+                }
+        }
     }
 
     var localHHmm: String {
@@ -191,6 +210,44 @@ final class TimeStore: ObservableObject {
             baseDate = newDate
         }
         isLive = false
+    }
+
+    func stepDay(for zone: ZoneDef, by delta: Int) {
+        let cal = calendar(for: zone.timeZone)
+        if let shifted = cal.date(byAdding: .day, value: delta, to: baseDate) {
+            baseDate = shifted
+        }
+        isLive = false
+    }
+
+    func stepMonth(for zone: ZoneDef, by delta: Int) {
+        let cur = yearMonthDay(for: baseDate, in: zone.timeZone)
+        var newM = cur.m + delta
+        var newY = cur.y
+        while newM < 1 {
+            newM += 12
+            newY -= 1
+        }
+        while newM > 12 {
+            newM -= 12
+            newY += 1
+        }
+        let newD = min(cur.d, Self.monthLength(year: newY, month: newM, timeZone: zone.timeZone))
+        setDate(for: zone, year: newY, month: newM, day: newD)
+    }
+
+    static func monthLength(year: Int, month: Int, timeZone: TimeZone) -> Int {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = 1
+        guard let d = cal.date(from: comps),
+              let r = cal.range(of: .day, in: .month, for: d) else {
+            return 31
+        }
+        return r.count
     }
 
     func stepMinute30(for zone: ZoneDef, by delta: Int) {

@@ -158,17 +158,7 @@ struct DateField: View {
     }
 
     private func monthLength(year: Int, month: Int) -> Int {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = timeZone
-        var comps = DateComponents()
-        comps.year = year
-        comps.month = month
-        comps.day = 1
-        guard let d = cal.date(from: comps),
-              let r = cal.range(of: .day, in: .month, for: d) else {
-            return 31
-        }
-        return r.count
+        TimeStore.monthLength(year: year, month: month, timeZone: timeZone)
     }
 
     private func notifyDateChanged(y: Int, m: Int, d: Int) {
