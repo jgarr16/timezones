@@ -78,39 +78,47 @@ struct ContentView: View {
             }
 
             HStack(spacing: 8) {
-                Circle()
-                    .fill(store.isLive ? Color.green : Color.gray)
-                    .frame(width: 6, height: 6)
-                Button(store.isLive ? "Pause" : "Now") {
-                    clearFocus()
-                    if store.isLive {
-                        store.pause()
-                    } else {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(store.isLive ? Color.green : Color.gray)
+                        .frame(width: 6, height: 6)
+                    Button("Reset") {
+                        clearFocus()
                         store.goLive()
                     }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+                    .frame(width: 36, alignment: .leading)
+                    .opacity(store.isLive ? 0 : 1)
+                    .disabled(store.isLive)
                 }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
+                .frame(width: 60, alignment: .leading)
                 Spacer()
                 Button(didCopy ? "Copied!" : "Copy All") {
                     copyAll()
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
+                .frame(width: 70)
                 .keyboardShortcut("m", modifiers: .command)
                 .help("Copy all rows as friendly text, one per line (Cmd+M)")
                 Spacer()
-                Button("Settings") {
-                    openWindow(id: "settings")
-                    NSApp.activate(ignoringOtherApps: true)
+                HStack(spacing: 8) {
+                    Button("Settings") {
+                        openWindow(id: "settings")
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+                    .frame(width: 50)
+                    Button("Quit") {
+                        NSApplication.shared.terminate(nil)
+                    }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+                    .frame(width: 28)
                 }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
-                Button("Quit") {
-                    NSApplication.shared.terminate(nil)
-                }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
+                .frame(width: 94, alignment: .trailing)
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
