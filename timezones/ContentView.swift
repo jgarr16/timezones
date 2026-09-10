@@ -9,12 +9,18 @@ struct ContentView: View {
         VStack(spacing: 6) {
             ForEach(store.zones) { zone in
                 let hm = store.hourMinute(for: store.baseDate, in: zone.timeZone)
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Text(zone.title)
                         .font(.system(size: 13))
-                        .frame(width: 64, alignment: .leading)
+                        .frame(width: 58, alignment: .leading)
                         .lineLimit(1)
-                    Spacer(minLength: 4)
+                    DateField(
+                        date: store.baseDate,
+                        timeZone: zone.timeZone,
+                        onDateChanged: { y, m, d in
+                            store.setDate(for: zone, year: y, month: m, day: d)
+                        }
+                    )
                     TimeWheelPicker(
                         hour: hm.h,
                         minute: hm.m,
@@ -33,7 +39,7 @@ struct ContentView: View {
                     Text(zone.abbreviation(for: store.baseDate))
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 44, alignment: .trailing)
+                        .frame(width: 36, alignment: .trailing)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 8)
@@ -73,7 +79,7 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .frame(width: 280)
+        .frame(width: 340)
     }
 
     private func clearFocus() {

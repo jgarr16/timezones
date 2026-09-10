@@ -105,6 +105,12 @@ final class TimeStore: ObservableObject {
         return (c.hour ?? 0, c.minute ?? 0)
     }
 
+    func yearMonthDay(for date: Date, in timeZone: TimeZone) -> (y: Int, m: Int, d: Int) {
+        let cal = calendar(for: timeZone)
+        let c = cal.dateComponents([.year, .month, .day], from: date)
+        return (c.year ?? 2000, c.month ?? 1, c.day ?? 1)
+    }
+
     func hhmm(for date: Date, in timeZone: TimeZone) -> String {
         let f = DateFormatter()
         f.timeZone = timeZone
@@ -123,6 +129,22 @@ final class TimeStore: ObservableObject {
         if let newDate = cal.date(from: comps) {
             baseDate = newDate
         }
+        isLive = false
+    }
+
+    func setDate(for zone: ZoneDef, year: Int, month: Int, day: Int) {
+        let cal = calendar(for: zone.timeZone)
+        var comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: baseDate)
+        comps.year = year
+        comps.month = month
+        comps.day = day
+        comps.second = 0
+        comps.nanosecond = 0
+        guard let newDate = cal.date(from: comps) else { return }
+        // Reject overflow normalization (e.g. Feb 30 -> Mar 2).
+        let check = cal.dateComponents([.year, .month, .day], from: newDate)
+        guard check.year == year, check.month == month, check.day == day else { return }
+        baseDate = newDate
         isLive = false
     }
 
