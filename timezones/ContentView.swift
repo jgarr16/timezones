@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     @ObservedObject var store: TimeStore
     @Environment(\.openWindow) private var openWindow
+    @State private var didCopy: Bool = false
 
     var body: some View {
         VStack(spacing: 6) {
@@ -39,8 +40,20 @@ struct ContentView: View {
                     Text(zone.gmtOffsetString(for: store.baseDate))
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 40, alignment: .trailing)
+                        .frame(width: 32, alignment: .trailing)
                         .lineLimit(1)
+                    Button {
+                        store.copySingleToClipboard(zone: zone)
+                        didCopy = true
+                        scheduleCopiedReset()
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Copy this row (Title M/D HH:mm)")
+                    .frame(width: 18)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -63,6 +76,14 @@ struct ContentView: View {
                 .buttonStyle(.link)
                 .font(.system(size: 11))
                 Spacer()
+                Button(didCopy ? "Copied!" : "Copy") {
+                    copyAll()
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+                .keyboardShortcut("m", modifiers: .command)
+                .help("Copy all rows, one per line (Cmd+M)")
+                Spacer()
                 Button("Settings") {
                     openWindow(id: "settings")
                     NSApp.activate(ignoringOtherApps: true)
@@ -79,7 +100,20 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .frame(width: 340)
+        .frame(width: 360)
+    }
+
+    private func copyAll() {
+        store.copyAllToClipboard()
+        didCopy = true
+        scheduleCopiedReset()
+    }
+
+    private func scheduleCopiedReset() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            didCopy = false
+        }
     }
 
     private func clearFocus() {

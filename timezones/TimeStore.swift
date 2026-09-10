@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import AppKit
 
 struct ZoneDef: Identifiable, Hashable {
     let id: String
@@ -172,6 +173,29 @@ final class TimeStore: ObservableObject {
         guard check.year == year, check.month == month, check.day == day else { return }
         baseDate = newDate
         isLive = false
+    }
+
+    func copyLine(for zone: ZoneDef) -> String {
+        let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
+        let hm = hourMinute(for: baseDate, in: zone.timeZone)
+        let offset = zone.gmtOffsetString(for: baseDate)
+        return String(format: "%@ %d/%d %02d:%02d (%@)", zone.title, ymd.m, ymd.d, hm.h, hm.m, offset)
+    }
+
+    var clipboardText: String {
+        zones.map { copyLine(for: $0) }.joined(separator: "\n")
+    }
+
+    func copyAllToClipboard() {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(clipboardText, forType: .string)
+    }
+
+    func copySingleToClipboard(zone: ZoneDef) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(copyLine(for: zone), forType: .string)
     }
 
     func goLive() {
