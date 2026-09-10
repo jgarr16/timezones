@@ -92,7 +92,7 @@ struct ContentView: View {
                 .buttonStyle(.link)
                 .font(.system(size: 11))
                 Spacer()
-                Button(didCopy ? "Copied!" : "Copy") {
+                Button(didCopy ? "Copied!" : "Copy All") {
                     copyAll()
                 }
                 .buttonStyle(.link)
