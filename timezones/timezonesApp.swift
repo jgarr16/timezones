@@ -52,7 +52,7 @@ struct OpenWindowInjector: View {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     static var instance: AppDelegate?
     static var pendingStore: TimeStore?
 
@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var cancellables = Set<AnyCancellable>()
+    private var windowCloseObserver: NSObjectProtocol?
 
     override init() {
         super.init()
@@ -79,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem(store: store)
         setupPopover(store: store)
         observeMenuBarText(store: store)
+        observeWindowClose()
         closeDetachedWindowAtLaunch()
     }
 
@@ -101,8 +103,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         p.contentSize = NSSize(width: 430, height: 480)
         p.behavior = .transient
         p.animates = true
+        p.delegate = self
         p.contentViewController = NSHostingController(rootView: ContentView(store: store))
         self.popover = p
+    }
+
+    private func observeWindowClose() {
+        windowCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let window = note.object as? NSWindow else { return }
+            if window.title == "Timezones" {
+                self?.store?.goLive()
+            }
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        store?.goLive()
     }
 
     private func closeDetachedWindowAtLaunch() {
