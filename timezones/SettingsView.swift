@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var zoneFilter: String = ""
     @State private var addError: String = ""
     @State private var partToAdd: CopyToken = .time24
+    @State private var presetName: String = ""
+    @State private var presetError: String = ""
 
     var filteredTZIDs: [String] {
         let all = TimeZone.knownTimeZoneIdentifiers.sorted()
@@ -34,25 +36,25 @@ struct SettingsView: View {
         CopyToken.allCases.filter { !store.isCopyTokenEnabled($0) }
     }
 
+    var cityGuess: String? {
+        TimeStore.suggestedTimeZoneID(forCity: newCity)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Time Zones")
                     .font(.system(size: 14, weight: .semibold))
-
                 Text("Local (system time zone) is shown by default. Add up to \(TimeStore.maxExtras) more (\(store.extraIDs.count)/\(TimeStore.maxExtras)).")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-
                 Text("City names are shown on the left and in copies. Edit to rename. Unchecked zones are hidden.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-
                 TextField("Search cities or zones (e.g. Chicago)", text: $zoneFilter)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
                     .help("Filter the list below by city or zone ID")
-
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -69,7 +71,6 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-
                 ForEach(filteredCatalog) { zone in
                     let selected = store.isSelected(id: zone.id)
                     let canSelect = selected || store.canAddMore()
@@ -83,7 +84,6 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                         .disabled(!canSelect)
                         .help(selected ? "Hide this zone" : "Show this zone")
-
                         TextField(zone.defaultCity, text: cityBinding(id: zone.id, defaultCity: zone.defaultCity))
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 13))
@@ -117,20 +117,40 @@ struct SettingsView: View {
                         }
                     }
                 }
-
                 if !zoneFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && filteredCatalog.isEmpty {
                     Text("No cities match \"\(zoneFilter)\". Try a zone ID below.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 8)
                 }
-
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Add your own city and time zone")
                         .font(.system(size: 12, weight: .semibold))
-                    TextField("City (e.g. Berlin)", text: $newCity)
+                    TextField("City (e.g. Austin)", text: $newCity)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
+                        .help("Type a city name - we will guess its time zone")
+                    if let guess = cityGuess, !newCity.trimmingCharacters(in: .whitespaces).isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundStyle(.secondary)
+                                .font(.system(size: 11))
+                            Text("\(newCity.trimmingCharacters(in: .whitespaces)) looks like \(guess)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Use") {
+                                newTZ = guess
+                                tzSearch = ""
+                            }
+                            .buttonStyle(.link)
+                            .font(.system(size: 11))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
                     TextField("Search time zones (e.g. Chicago, Berlin, Seoul)", text: $tzSearch)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
@@ -204,16 +224,12 @@ struct SettingsView: View {
                 .padding(.vertical, 6)
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-
                 Divider()
-
                 Text("Copy Format")
                     .font(.system(size: 14, weight: .semibold))
-
                 Text("Select parts to include. Use the arrows to change order.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-
                 VStack(spacing: 2) {
                     ForEach(store.copyOrder) { token in
                         HStack(spacing: 8) {
@@ -268,7 +284,6 @@ struct SettingsView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                 )
-
                 HStack(spacing: 6) {
                     Picker("Add part", selection: $partToAdd) {
                         ForEach(availableTokensToAdd) { token in
@@ -295,7 +310,6 @@ struct SettingsView: View {
                 .padding(.vertical, 6)
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-
                 HStack(spacing: 8) {
                     Text("Preview:")
                         .font(.system(size: 11))
@@ -314,6 +328,71 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                 }
                 .padding(.top, 4)
+                Divider()
+                Text("Copy Presets")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Save the current format under a name like Chris or Work, then apply with one click.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    TextField("Preset name (e.g. Chris)", text: $presetName)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity)
+                    Button("Save") {
+                        if store.saveCopyPreset(name: presetName) {
+                            presetName = ""
+                            presetError = ""
+                        } else {
+                            presetError = "Enter a name and include at least one part."
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                if !presetError.isEmpty {
+                    Text(presetError)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                }
+                if store.copyPresets.isEmpty {
+                    Text("No presets yet. Configure parts above and save.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(spacing: 2) {
+                        ForEach(store.copyPresets) { preset in
+                            HStack(spacing: 8) {
+                                Button {
+                                    store.applyCopyPreset(id: preset.id)
+                                } label: {
+                                    Text(preset.name)
+                                        .font(.system(size: 12, weight: .medium))
+                                }
+                                .buttonStyle(.link)
+                                .help("Apply this preset")
+                                Spacer()
+                                Text(preset.tokens.map { $0.example }.joined(separator: " "))
+                                    .font(.system(size: 10).monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Button {
+                                    store.deleteCopyPreset(id: preset.id)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Delete preset")
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                }
             }
             .padding(14)
         }

@@ -53,6 +53,12 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+struct CopyPreset: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var tokens: [CopyToken]
+}
+
 struct CustomZone: Codable, Hashable, Identifiable {
     var id: String
     var city: String
@@ -135,6 +141,13 @@ final class TimeStore: ObservableObject {
             }
         }
     }
+    @Published var copyPresets: [CopyPreset] {
+        didSet {
+            if let data = try? JSONEncoder().encode(copyPresets) {
+                userDefaults.set(data, forKey: Self.copyPresetsKey)
+            }
+        }
+    }
 
     private var userDefaults: UserDefaults
     private var timerCancellable: AnyCancellable?
@@ -144,6 +157,7 @@ final class TimeStore: ObservableObject {
     static let copyKey = "copySelectedIDs"
     static let copyOrderKey = "copyTokenOrder"
     static let customZonesKey = "customZones"
+    static let copyPresetsKey = "copyPresets"
     static let maxExtras = 8
 
     static let catalog: [ZoneDef] = []
@@ -166,6 +180,90 @@ final class TimeStore: ObservableObject {
 
     static let defaultExtras: [String] = []
     static let defaultCopyOrder: [CopyToken] = [.city, .date, .time12, .abbr]
+
+    // MARK: - City to time zone guessing (offline, on the fly)
+    static let cityTimeZoneMap: [String: String] = [
+        "austin": "America/Chicago",
+        "dallas": "America/Chicago",
+        "houston": "America/Chicago",
+        "san antonio": "America/Chicago",
+        "chicago": "America/Chicago",
+        "minneapolis": "America/Chicago",
+        "st louis": "America/Chicago",
+        "new orleans": "America/Chicago",
+        "memphis": "America/Chicago",
+        "nashville": "America/Chicago",
+        "kansas city": "America/Chicago",
+        "oklahoma city": "America/Chicago",
+        "new york": "America/New_York",
+        "boston": "America/New_York",
+        "philadelphia": "America/New_York",
+        "washington": "America/New_York",
+        "atlanta": "America/New_York",
+        "miami": "America/New_York",
+        "orlando": "America/New_York",
+        "detroit": "America/New_York",
+        "cleveland": "America/New_York",
+        "pittsburgh": "America/New_York",
+        "charlotte": "America/New_York",
+        "los angeles": "America/Los_Angeles",
+        "san francisco": "America/Los_Angeles",
+        "san diego": "America/Los_Angeles",
+        "mountain view": "America/Los_Angeles",
+        "cupertino": "America/Los_Angeles",
+        "palo alto": "America/Los_Angeles",
+        "seattle": "America/Los_Angeles",
+        "portland": "America/Los_Angeles",
+        "las vegas": "America/Los_Angeles",
+        "denver": "America/Denver",
+        "salt lake city": "America/Denver",
+        "phoenix": "America/Phoenix",
+        "honolulu": "Pacific/Honolulu",
+        "anchorage": "America/Anchorage",
+        "london": "Europe/London",
+        "paris": "Europe/Paris",
+        "berlin": "Europe/Berlin",
+        "rome": "Europe/Rome",
+        "madrid": "Europe/Madrid",
+        "amsterdam": "Europe/Amsterdam",
+        "zurich": "Europe/Zurich",
+        "stockholm": "Europe/Stockholm",
+        "athens": "Europe/Athens",
+        "istanbul": "Europe/Istanbul",
+        "dubai": "Asia/Dubai",
+        "mumbai": "Asia/Kolkata",
+        "delhi": "Asia/Kolkata",
+        "kolkata": "Asia/Kolkata",
+        "bangkok": "Asia/Bangkok",
+        "singapore": "Asia/Singapore",
+        "hong kong": "Asia/Hong_Kong",
+        "shanghai": "Asia/Shanghai",
+        "beijing": "Asia/Shanghai",
+        "seoul": "Asia/Seoul",
+        "tokyo": "Asia/Tokyo",
+        "osaka": "Asia/Tokyo",
+        "sydney": "Australia/Sydney",
+        "melbourne": "Australia/Melbourne",
+        "auckland": "Pacific/Auckland",
+        "toronto": "America/Toronto",
+        "vancouver": "America/Vancouver",
+        "mexico city": "America/Mexico_City",
+        "sao paulo": "America/Sao_Paulo",
+        "london uk": "Europe/London",
+        "gmt": "UTC",
+        "utc": "UTC",
+        "zulu": "UTC"
+    ]
+
+    static func suggestedTimeZoneID(forCity city: String) -> String? {
+        let key = city.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if key.isEmpty { return nil }
+        if let direct = cityTimeZoneMap[key] { return direct }
+        for (k, v) in cityTimeZoneMap where key.contains(k) {
+            return v
+        }
+        return nil
+    }
 
     var localDef: ZoneDef {
         ZoneDef(id: "local", title: "Local", defaultCity: "Local", timeZone: TimeZone.autoupdatingCurrent)
@@ -194,6 +292,7 @@ final class TimeStore: ObservableObject {
         copySelectedIDs: Set<String>? = nil,
         copyOrder: [CopyToken]? = nil,
         customZones: [CustomZone]? = nil,
+        copyPresets: [CopyPreset]? = nil,
         userDefaults: UserDefaults = .standard,
         enableTimer: Bool = true
     ) {
@@ -266,6 +365,14 @@ final class TimeStore: ObservableObject {
             self.copyOrder = parsed.isEmpty ? Self.defaultCopyOrder : parsed
         } else {
             self.copyOrder = Self.defaultCopyOrder
+        }
+        if let copyPresets {
+            self.copyPresets = copyPresets
+        } else if let data = userDefaults.data(forKey: Self.copyPresetsKey),
+                  let decoded = try? JSONDecoder().decode([CopyPreset].self, from: data) {
+            self.copyPresets = decoded
+        } else {
+            self.copyPresets = []
         }
         if enableTimer {
             timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
@@ -394,6 +501,29 @@ final class TimeStore: ObservableObject {
         let enabled = copyOrder
         let disabled = CopyToken.allCases.filter { !enabled.contains($0) }
         return enabled + disabled
+    }
+
+    func saveCopyPreset(name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard !copyOrder.isEmpty else { return false }
+        if let idx = copyPresets.firstIndex(where: { $0.name.lowercased() == trimmed.lowercased() }) {
+            copyPresets[idx].tokens = copyOrder
+        } else {
+            let p = CopyPreset(id: "preset-" + UUID().uuidString.prefix(8).lowercased(), name: trimmed, tokens: copyOrder)
+            copyPresets.append(p)
+        }
+        return true
+    }
+
+    func applyCopyPreset(id: String) {
+        if let p = copyPresets.first(where: { $0.id == id }) {
+            copyOrder = p.tokens
+        }
+    }
+
+    func deleteCopyPreset(id: String) {
+        copyPresets.removeAll(where: { $0.id == id })
     }
 
     func calendar(for timeZone: TimeZone) -> Calendar {
