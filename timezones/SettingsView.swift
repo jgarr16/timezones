@@ -3,8 +3,21 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var store: TimeStore
     @State private var newCity: String = ""
-    @State private var newTZ: String = ""
+    @State private var newTZ: String = "Europe/Berlin"
+    @State private var tzSearch: String = ""
     @State private var addError: String = ""
+    @State private var partToAdd: CopyToken = .time24
+
+    var filteredTZIDs: [String] {
+        let all = TimeZone.knownTimeZoneIdentifiers.sorted()
+        let q = tzSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty { return all }
+        return all.filter { $0.localizedCaseInsensitiveContains(q) }
+    }
+
+    var availableTokensToAdd: [CopyToken] {
+        CopyToken.allCases.filter { !store.isCopyTokenEnabled($0) }
+    }
 
     var body: some View {
         ScrollView {
@@ -16,7 +29,7 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
-                Text("City names are shown on the left and in copies. Edit to rename.")
+                Text("City names are shown on the left and in copies. Edit to rename. Unchecked zones are hidden.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
@@ -49,6 +62,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!canSelect)
+                        .help(selected ? "Hide this zone" : "Show this zone")
 
                         TextField(zone.defaultCity, text: cityBinding(id: zone.id, defaultCity: zone.defaultCity))
                             .textFieldStyle(.roundedBorder)
@@ -59,38 +73,56 @@ struct SettingsView: View {
                             .font(.system(size: 10).monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        if store.isCustomZone(id: zone.id) {
-                            Button {
-                                store.removeCustomZone(id: zone.id)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Remove custom zone")
-                        }
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .opacity(canSelect ? 1.0 : 0.4)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if store.isCustomZone(id: zone.id) {
+                            Button(role: .destructive) {
+                                store.removeCustomZone(id: zone.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                    .contextMenu {
+                        if store.isCustomZone(id: zone.id) {
+                            Button(role: .destructive) {
+                                store.removeCustomZone(id: zone.id)
+                            } label: {
+                                Text("Delete \(store.cityName(for: zone))")
+                            }
+                        }
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Add your own city and time zone")
                         .font(.system(size: 12, weight: .semibold))
+                    TextField("City (e.g. Berlin)", text: $newCity)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
                     HStack(spacing: 6) {
-                        TextField("City (e.g. Berlin)", text: $newCity)
+                        TextField("Search zones", text: $tzSearch)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12))
-                            .frame(width: 130)
-                        TextField("Zone ID (e.g. Europe/Berlin)", text: $newTZ)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12))
-                            .frame(width: 150)
+                            .frame(width: 110)
+                        Picker("Time zone", selection: $newTZ) {
+                            ForEach(filteredTZIDs, id: \.self) { tz in
+                                Text(tz).tag(tz)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity)
+                        .help("Pick an IANA time zone")
+                    }
+                    HStack(spacing: 6) {
                         Button("Add") {
                             if store.addCustomZone(city: newCity, timeZoneID: newTZ) {
                                 newCity = ""
-                                newTZ = ""
+                                tzSearch = ""
                                 addError = ""
                             } else {
                                 addError = "Check city, valid Zone ID, and room (max \(TimeStore.maxExtras))."
@@ -98,16 +130,17 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .disabled(!store.canAddMore())
+                        .disabled(!store.canAddMore() || newCity.trimmingCharacters(in: .whitespaces).isEmpty)
+                        Spacer()
+                        Text("Custom zones support swipe-left to delete.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                     if !addError.isEmpty {
                         Text(addError)
                             .font(.system(size: 11))
                             .foregroundStyle(.red)
                     }
-                    Text("Use an IANA name like America/Chicago or Asia/Seoul.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
@@ -124,28 +157,14 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 VStack(spacing: 2) {
-                    ForEach(store.orderedTokensForDisplay()) { token in
-                        let enabled = store.isCopyTokenEnabled(token)
-                        let orderIndex = store.copyOrder.firstIndex(of: token)
+                    ForEach(store.copyOrder) { token in
                         HStack(spacing: 8) {
-                            Button {
-                                store.toggleCopyToken(token)
-                            } label: {
-                                Image(systemName: enabled ? "checkmark.square.fill" : "square")
-                                    .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            if let idx = orderIndex {
-                                Text("\(idx + 1)")
-                                    .font(.system(size: 11).monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 18)
-                            } else {
-                                Color.clear.frame(width: 18)
-                            }
+                            Text("\(store.copyOrder.firstIndex(of: token)! + 1)")
+                                .font(.system(size: 11).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18)
                             Text(token.title)
                                 .font(.system(size: 12))
-                                .foregroundStyle(enabled ? .primary : .secondary)
                             Spacer()
                             Text(token.example)
                                 .font(.system(size: 11).monospacedDigit())
@@ -156,25 +175,68 @@ struct SettingsView: View {
                                 Image(systemName: "chevron.up")
                             }
                             .buttonStyle(.plain)
-                            .disabled(!enabled || store.copyOrder.first == token)
+                            .disabled(store.copyOrder.first == token)
+                            .help("Move up")
                             Button {
                                 store.moveCopyToken(id: token, by: 1)
                             } label: {
                                 Image(systemName: "chevron.down")
                             }
                             .buttonStyle(.plain)
-                            .disabled(!enabled || store.copyOrder.last == token)
+                            .disabled(store.copyOrder.last == token)
+                            .help("Move down")
+                            Button {
+                                store.toggleCopyToken(token)
+                            } label: {
+                                Image(systemName: "xmark.circle")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove from copy")
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(enabled ? Color.accentColor.opacity(0.08) : Color.clear)
+                        .background(Color.accentColor.opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    if store.copyOrder.isEmpty {
+                        Text("Nothing selected. Add a part below.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 6)
                     }
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                 )
+
+                HStack(spacing: 6) {
+                    Picker("Add part", selection: $partToAdd) {
+                        ForEach(availableTokensToAdd) { token in
+                            Text(token.title).tag(token)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .font(.system(size: 12))
+                    .frame(maxWidth: .infinity)
+                    .disabled(availableTokensToAdd.isEmpty)
+                    Button("Add") {
+                        if !store.isCopyTokenEnabled(partToAdd) {
+                            store.toggleCopyToken(partToAdd)
+                        }
+                        if let next = CopyToken.allCases.first(where: { !store.isCopyTokenEnabled($0) }) {
+                            partToAdd = next
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(availableTokensToAdd.isEmpty)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
 
                 HStack(spacing: 8) {
                     Text("Preview:")
@@ -198,6 +260,14 @@ struct SettingsView: View {
             .padding(14)
         }
         .frame(width: 360, height: 520)
+        .onAppear {
+            if !TimeZone.knownTimeZoneIdentifiers.contains(newTZ) {
+                newTZ = TimeZone.knownTimeZoneIdentifiers.sorted().first ?? "UTC"
+            }
+            if let firstAvailable = availableTokensToAdd.first {
+                partToAdd = firstAvailable
+            }
+        }
     }
 
     private func cityBinding(id: String, defaultCity: String) -> Binding<String> {
