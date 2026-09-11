@@ -1,4 +1,3 @@
-// entire file content ...
 import SwiftUI
 import Combine
 import AppKit
@@ -113,30 +112,29 @@ final class TimeStore: ObservableObject {
         self.baseDate = initialBase
         self.liveNow = liveNow ?? initialBase
         self.isLive = isLive
+        let resolvedExtraIDs: [String]
         if let extraIDs {
-            self.extraIDs = Array(extraIDs.prefix(Self.maxExtras))
+            resolvedExtraIDs = Array(extraIDs.prefix(Self.maxExtras))
         } else {
             let saved = userDefaults.stringArray(forKey: Self.storageKey)
             if let saved, !saved.isEmpty {
-                self.extraIDs = Array(saved.prefix(Self.maxExtras))
+                resolvedExtraIDs = Array(saved.prefix(Self.maxExtras))
             } else {
-                self.extraIDs = Self.defaultExtras
+                resolvedExtraIDs = Self.defaultExtras
             }
         }
+        self.extraIDs = resolvedExtraIDs
         if let customCities {
             self.customCities = customCities
         } else {
             self.customCities = (userDefaults.dictionary(forKey: Self.citiesKey) as? [String: String]) ?? [:]
         }
-        // Compute current zone ids for default copy selection.
-        let currentIDs: Set<String> = {
-            var ids = Set<String>()
-            ids.insert("local")
-            for id in self.extraIDs {
-                ids.insert(id)
-            }
-            return ids
-        }()
+        // Compute current zone ids for default copy selection without capturing self.
+        var currentIDs = Set<String>()
+        currentIDs.insert("local")
+        for id in resolvedExtraIDs {
+            currentIDs.insert(id)
+        }
         if let copySelectedIDs {
             self.copySelectedIDs = copySelectedIDs
         } else if let savedCopy = userDefaults.stringArray(forKey: Self.copyKey) {
