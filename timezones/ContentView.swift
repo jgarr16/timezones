@@ -7,93 +7,95 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            ForEach(store.zones) { zone in
-                let hm = store.hourMinute(for: store.baseDate, in: zone.timeZone)
-                HStack(spacing: 6) {
-                    Button {
-                        store.toggleCopy(id: zone.id)
-                    } label: {
-                        Image(systemName: store.isCopySelected(id: zone.id) ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(store.isCopySelected(id: zone.id) ? Color.accentColor : Color.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Include in Copy Selected")
-                    .frame(width: 18)
-                    Text(store.cityName(for: zone))
-                        .font(.system(size: 13))
-                        .frame(width: 110, alignment: .leading)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    HStack(spacing: 2) {
-                        HoldStepButton(systemName: "minus", helpText: "Previous day") {
-                            store.stepDay(for: zone, by: -1)
-                        }
-                        DateField(
-                            date: store.baseDate,
-                            timeZone: zone.timeZone,
-                            onDateChanged: { y, m, d in
-                                DispatchQueue.main.async {
-                                    store.setDate(for: zone, year: y, month: m, day: d)
+            ScrollView {
+                LazyVStack(spacing: 6) {
+                    ForEach(store.zones) { zone in
+                        let hm = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                        HStack(spacing: 6) {
+                            Button {
+                                store.toggleCopy(id: zone.id)
+                            } label: {
+                                Image(systemName: store.isCopySelected(id: zone.id) ? "checkmark.square.fill" : "square")
+                                    .foregroundStyle(store.isCopySelected(id: zone.id) ? Color.accentColor : Color.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Include in Copy Selected")
+                            .frame(width: 18)
+                            Text(store.cityName(for: zone))
+                                .font(.system(size: 13))
+                                .frame(width: 90, alignment: .leading)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            HStack(spacing: 2) {
+                                DateField(
+                                    date: store.baseDate,
+                                    timeZone: zone.timeZone,
+                                    onDateChanged: { y, m, d in
+                                        DispatchQueue.main.async {
+                                            store.setDate(for: zone, year: y, month: m, day: d)
+                                        }
+                                    }
+                                )
+                                ZoneCalendarButton(store: store, zone: zone)
+                            }
+                            HStack(spacing: 2) {
+                                HoldStepButton(systemName: "minus", helpText: "Back 30 minutes (snaps to :00 / :30 first)") {
+                                    store.stepMinute30(for: zone, by: -1)
+                                }
+                                TimeWheelPicker(
+                                    hour: hm.h,
+                                    minute: hm.m,
+                                    onHourChanged: { newHour in
+                                        DispatchQueue.main.async {
+                                            let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                                            store.setTime(for: zone, newHour: newHour, newMinute: cur.m)
+                                        }
+                                    },
+                                    onMinuteChanged: { newMinute in
+                                        DispatchQueue.main.async {
+                                            let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
+                                            store.setTime(for: zone, newHour: cur.h, newMinute: newMinute)
+                                        }
+                                    },
+                                    onHourStep: { delta in
+                                        DispatchQueue.main.async {
+                                            store.stepHour(for: zone, by: delta)
+                                        }
+                                    },
+                                    onMinuteStep: { delta in
+                                        DispatchQueue.main.async {
+                                            store.stepMinute30(for: zone, by: delta)
+                                        }
+                                    }
+                                )
+                                .layoutPriority(1)
+                                HoldStepButton(systemName: "plus", helpText: "Forward 30 minutes (snaps to :00 / :30 first)") {
+                                    store.stepMinute30(for: zone, by: 1)
                                 }
                             }
-                        )
-                        HoldStepButton(systemName: "plus", helpText: "Next day") {
-                            store.stepDay(for: zone, by: 1)
+                            Text(zone.abbreviation(for: store.baseDate))
+                                .font(.system(size: 10).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 40, alignment: .trailing)
+                                .lineLimit(1)
                         }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
-                    HStack(spacing: 2) {
-                        HoldStepButton(systemName: "minus", helpText: "Back 30 minutes (snaps to :00 / :30 first)") {
-                            store.stepMinute30(for: zone, by: -1)
-                        }
-                        TimeWheelPicker(
-                            hour: hm.h,
-                            minute: hm.m,
-                            onHourChanged: { newHour in
-                                DispatchQueue.main.async {
-                                    let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
-                                    store.setTime(for: zone, newHour: newHour, newMinute: cur.m)
-                                }
-                            },
-                            onMinuteChanged: { newMinute in
-                                DispatchQueue.main.async {
-                                    let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
-                                    store.setTime(for: zone, newHour: cur.h, newMinute: newMinute)
-                                }
-                            },
-                            onHourStep: { delta in
-                                DispatchQueue.main.async {
-                                    store.stepHour(for: zone, by: delta)
-                                }
-                            },
-                            onMinuteStep: { delta in
-                                DispatchQueue.main.async {
-                                    store.stepMinute30(for: zone, by: delta)
-                                }
-                            }
-                        )
-                        .layoutPriority(1)
-                        HoldStepButton(systemName: "plus", helpText: "Forward 30 minutes (snaps to :00 / :30 first)") {
-                            store.stepMinute30(for: zone, by: 1)
-                        }
-                    }
-                    Text(zone.abbreviation(for: store.baseDate))
-                        .font(.system(size: 10).monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 40, alignment: .trailing)
-                        .lineLimit(1)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
+            .scrollIndicators(.never)
+            .frame(maxHeight: 360)
+            .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 16)
+            Spacer(minLength: 8)
 
             Divider()
 
             HStack(spacing: 8) {
-                Button("Reset") {
+                Button("Now") {
                     clearFocus()
                     store.goLive()
                 }
@@ -120,7 +122,8 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .frame(width: 430)
+        .frame(minWidth: 340, idealWidth: 380, maxWidth: 480)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func copyAll() {
@@ -138,6 +141,45 @@ struct ContentView: View {
 
     private func clearFocus() {
         NSApplication.shared.keyWindow?.makeFirstResponder(nil)
+    }
+}
+
+struct ZoneCalendarButton: View {
+    @ObservedObject var store: TimeStore
+    let zone: ZoneDef
+    @State private var showCalendar: Bool = false
+
+    var body: some View {
+        Button {
+            showCalendar.toggle()
+        } label: {
+            Image(systemName: "calendar")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Pick date in \(store.cityName(for: zone))")
+        .popover(isPresented: $showCalendar, arrowEdge: .bottom) {
+            DatePicker(
+                "Date",
+                selection: Binding(
+                    get: { store.baseDate },
+                    set: { newValue in
+                        let ymd = store.yearMonthDay(for: newValue, in: zone.timeZone)
+                        DispatchQueue.main.async {
+                            store.setDate(for: zone, year: ymd.y, month: ymd.m, day: ymd.d)
+                        }
+                    }
+                ),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .environment(\.timeZone, zone.timeZone)
+            .padding(10)
+            .frame(width: 280)
+        }
     }
 }
 

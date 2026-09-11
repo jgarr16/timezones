@@ -23,7 +23,7 @@ struct timezonesApp: App {
                 OpenWindowInjector()
                     .frame(width: 0, height: 0)
             }
-            .frame(minWidth: 430, minHeight: 200)
+            .frame(minWidth: 360, idealWidth: 390, maxWidth: 500, minHeight: 200)
         }
         .windowResizability(.contentSize)
 
@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func setupPopover(store: TimeStore) {
         let p = NSPopover()
-        p.contentSize = NSSize(width: 430, height: 480)
+        p.contentSize = NSSize(width: 390, height: 360)
         p.behavior = .transient
         p.animates = true
         p.delegate = self
