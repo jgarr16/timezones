@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func setupPopover(store: TimeStore) {
         let p = NSPopover()
-        p.contentSize = NSSize(width: 430, height: 480)
+        p.contentSize = NSSize(width: 470, height: 480)
         p.behavior = .transient
         p.animates = true
         p.delegate = self
