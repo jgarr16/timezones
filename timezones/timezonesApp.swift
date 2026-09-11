@@ -72,6 +72,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Prevent macOS from restoring Settings window from previous session.
+        // This is what made Settings persist on screen after relaunch.
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+        closeLaunchWindowsNow()
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        // Disable secure state restoration so detached windows do not come back.
+        return false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if store == nil {
             store = AppDelegate.pendingStore
@@ -125,12 +137,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store?.goLive()
     }
 
+    private func closeLaunchWindowsNow() {
+        for window in NSApp.windows where window.title == "Timezones" || window.title == "Settings" {
+            window.alphaValue = 0
+            window.orderOut(nil)
+            window.close()
+        }
+    }
+
     private func closeDetachedWindowAtLaunch() {
+        // The Window(id: main) Scene opens automatically on launch.
+        // We want menu-bar popover by default, detached only on demand.
+        // Hide with alpha 0 + orderOut to avoid animated flicker/blip.
         func closeLaunchWindows() {
             for window in NSApp.windows where window.title == "Timezones" || window.title == "Settings" {
+                window.alphaValue = 0
+                window.orderOut(nil)
                 window.close()
             }
         }
+        closeLaunchWindows()
         DispatchQueue.main.async {
             closeLaunchWindows()
         }

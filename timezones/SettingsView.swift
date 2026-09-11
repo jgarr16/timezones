@@ -5,6 +5,7 @@ struct SettingsView: View {
     @State private var newCity: String = ""
     @State private var newTZ: String = "Europe/Berlin"
     @State private var tzSearch: String = ""
+    @State private var zoneFilter: String = ""
     @State private var addError: String = ""
     @State private var partToAdd: CopyToken = .time24
 
@@ -13,6 +14,20 @@ struct SettingsView: View {
         let q = tzSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         if q.isEmpty { return all }
         return all.filter { $0.localizedCaseInsensitiveContains(q) }
+    }
+
+    var pickerVisibleIDs: [String] {
+        Array(filteredTZIDs.prefix(50))
+    }
+
+    var filteredCatalog: [ZoneDef] {
+        let q = zoneFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty { return store.allCatalog }
+        return store.allCatalog.filter { zone in
+            store.cityName(for: zone).localizedCaseInsensitiveContains(q) ||
+            zone.timeZone.identifier.localizedCaseInsensitiveContains(q) ||
+            zone.title.localizedCaseInsensitiveContains(q)
+        }
     }
 
     var availableTokensToAdd: [CopyToken] {
@@ -33,6 +48,11 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
+                TextField("Search cities or zones (e.g. Chicago)", text: $zoneFilter)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+                    .help("Filter the list below by city or zone ID")
+
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -50,7 +70,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
 
-                ForEach(store.allCatalog) { zone in
+                ForEach(filteredCatalog) { zone in
                     let selected = store.isSelected(id: zone.id)
                     let canSelect = selected || store.canAddMore()
                     HStack(spacing: 8) {
@@ -98,17 +118,24 @@ struct SettingsView: View {
                     }
                 }
 
+                if !zoneFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && filteredCatalog.isEmpty {
+                    Text("No cities match \"\(zoneFilter)\". Try a zone ID below.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Add your own city and time zone")
                         .font(.system(size: 12, weight: .semibold))
                     TextField("City (e.g. Berlin)", text: $newCity)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
+                    TextField("Search time zones (e.g. Chicago, Berlin, Seoul)", text: $tzSearch)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
+                        .help("Type to filter the time zone list below")
                     HStack(spacing: 6) {
-                        TextField("Search zones", text: $tzSearch)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12))
-                            .frame(width: 110)
                         Picker("Time zone", selection: $newTZ) {
                             ForEach(filteredTZIDs, id: \.self) { tz in
                                 Text(tz).tag(tz)
@@ -118,6 +145,42 @@ struct SettingsView: View {
                         .font(.system(size: 12))
                         .frame(maxWidth: .infinity)
                         .help("Pick an IANA time zone")
+                    }
+                    if !filteredTZIDs.isEmpty {
+                        Text("\(filteredTZIDs.count) matches\(filteredTZIDs.count > 50 ? " - showing first 50, refine search" : ""). Selected: \(newTZ)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        VStack(spacing: 2) {
+                            ForEach(pickerVisibleIDs, id: \.self) { tz in
+                                Button {
+                                    newTZ = tz
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: newTZ == tz ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(newTZ == tz ? Color.accentColor : Color.secondary)
+                                            .font(.system(size: 11))
+                                        Text(tz)
+                                            .font(.system(size: 12).monospacedDigit())
+                                            .foregroundStyle(.primary)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(newTZ == tz ? Color.accentColor.opacity(0.12) : Color.clear)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .frame(maxHeight: 140)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    } else {
+                        Text("No time zones match \"\(tzSearch)\".")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                     HStack(spacing: 6) {
                         Button("Add") {
