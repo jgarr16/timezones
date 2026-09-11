@@ -28,10 +28,12 @@ struct timezonesApp: App {
         .windowResizability(.contentSize)
 
         Window("Settings", id: "settings") {
-            SettingsView(store: store)
-                .frame(minWidth: 280, minHeight: 320)
-            OpenWindowInjector()
-                .frame(width: 0, height: 0)
+            VStack(spacing: 0) {
+                SettingsView(store: store)
+                    .frame(minWidth: 280, minHeight: 320)
+                OpenWindowInjector()
+                    .frame(width: 0, height: 0)
+            }
         }
         .windowResizability(.contentSize)
     }
@@ -106,11 +108,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func closeDetachedWindowAtLaunch() {
         // The Window(id: main) Scene opens automatically on launch.
+        // macOS also restores the Settings window if it was open at quit.
         // We want menu-bar popover by default, detached only on demand.
-        DispatchQueue.main.async {
-            for window in NSApp.windows where window.title == "Timezones" {
+        // Close immediately and again shortly after to catch restoration.
+        // The brief blip is SwiftUI creating the Window before we can close it.
+        func closeLaunchWindows() {
+            for window in NSApp.windows where window.title == "Timezones" || window.title == "Settings" {
                 window.close()
             }
+        }
+        DispatchQueue.main.async {
+            closeLaunchWindows()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            closeLaunchWindows()
         }
     }
 
@@ -196,12 +207,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let detachedItem = NSMenuItem(title: "Open Detached Window...", action: #selector(openDetachedWindow), keyEquivalent: "")
+        let detachedItem = NSMenuItem(title: "New Window", action: #selector(openDetachedWindow), keyEquivalent: "")
         detachedItem.target = self
+        detachedItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: "New Window")
         menu.addItem(detachedItem)
 
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
         settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gear", accessibilityDescription: "Settings")
         menu.addItem(settingsItem)
 
         menu.addItem(NSMenuItem.separator())
