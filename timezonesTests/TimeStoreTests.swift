@@ -334,16 +334,21 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertTrue(store.isLive)
     }
 
-    // MARK: - Settings selection up to 5
+    // MARK: - Settings selection up to 8, 5 by default
 
-    func testToggleMaxFive() {
+    func testDefaultExtrasIsFive() {
+        XCTAssertEqual(TimeStore.defaultExtras.count, 5)
+        XCTAssertEqual(TimeStore.maxExtras, 8)
+    }
+
+    func testToggleMaxEight() {
         let store = makeStore(baseDate: Date(), extraIDs: [])
-        let ids = ["zulu", "central", "eastern", "pacific", "mountain", "london"]
+        let ids = ["zulu", "central", "eastern", "pacific", "mountain", "london", "paris", "dubai", "tokyo"]
         for id in ids {
             store.toggle(id: id)
         }
         XCTAssertEqual(store.extraIDs.count, TimeStore.maxExtras)
-        XCTAssertFalse(store.isSelected(id: "london"))
+        XCTAssertFalse(store.isSelected(id: "tokyo"))
         XCTAssertTrue(store.canAddMore() == false)
         store.toggle(id: "zulu")
         XCTAssertFalse(store.isSelected(id: "zulu"))

@@ -30,6 +30,8 @@ struct timezonesApp: App {
         Window("Settings", id: "settings") {
             SettingsView(store: store)
                 .frame(minWidth: 280, minHeight: 320)
+            OpenWindowInjector()
+                .frame(width: 0, height: 0)
         }
         .windowResizability(.contentSize)
     }
@@ -76,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem(store: store)
         setupPopover(store: store)
         observeMenuBarText(store: store)
+        closeDetachedWindowAtLaunch()
     }
 
     private func setupStatusItem(store: TimeStore) {
@@ -94,11 +97,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPopover(store: TimeStore) {
         let p = NSPopover()
-        p.contentSize = NSSize(width: 430, height: 320)
+        p.contentSize = NSSize(width: 430, height: 480)
         p.behavior = .transient
         p.animates = true
         p.contentViewController = NSHostingController(rootView: ContentView(store: store))
         self.popover = p
+    }
+
+    private func closeDetachedWindowAtLaunch() {
+        // The Window(id: main) Scene opens automatically on launch.
+        // We want menu-bar popover by default, detached only on demand.
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.title == "Timezones" {
+                window.close()
+            }
+        }
     }
 
     private func observeMenuBarText(store: TimeStore) {
@@ -183,6 +196,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let detachedItem = NSMenuItem(title: "Open Detached Window...", action: #selector(openDetachedWindow), keyEquivalent: "")
+        detachedItem.target = self
+        menu.addItem(detachedItem)
+
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -194,6 +211,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
 
         return menu
+    }
+
+    @objc private func openDetachedWindow() {
+        if let action = openWindowAction {
+            action("main")
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            for window in NSApp.windows where window.title == "Timezones" {
+                window.makeKeyAndOrderFront(nil)
+                return
+            }
+        }
     }
 
     @objc private func openSettings() {

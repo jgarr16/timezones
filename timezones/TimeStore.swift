@@ -66,7 +66,7 @@ final class TimeStore: ObservableObject {
     static let storageKey = "extraZoneIDs"
     static let citiesKey = "customCityNames"
     static let copyKey = "copySelectedIDs"
-    static let maxExtras = 5
+    static let maxExtras = 8
 
     static let catalog: [ZoneDef] = [
         ZoneDef(id: "zulu", title: "GMT", defaultCity: "London", timeZone: TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0)!),
@@ -84,7 +84,7 @@ final class TimeStore: ObservableObject {
         ZoneDef(id: "auckland", title: "Auckland", defaultCity: "Auckland", timeZone: TimeZone(identifier: "Pacific/Auckland") ?? TimeZone.current)
     ]
 
-    static let defaultExtras = ["zulu", "central"]
+    static let defaultExtras = ["zulu", "central", "eastern", "pacific", "seoul"]
 
     var localDef: ZoneDef {
         ZoneDef(id: "local", title: "KST", defaultCity: "Seoul", timeZone: TimeZone.autoupdatingCurrent)
