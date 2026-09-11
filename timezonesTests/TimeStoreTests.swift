@@ -108,16 +108,16 @@ final class TimeStoreTests: XCTestCase {
     func testCopyPresetsSaveApplyDelete() {
         let store = makeStore(baseDate: Date())
         store.copyOrder = [.city, .date, .time12, .abbr]
-        XCTAssertTrue(store.saveCopyPreset(name: "Chris"))
+        XCTAssertTrue(store.saveCopyPreset(name: "Customers"))
         XCTAssertEqual(store.copyPresets.count, 1)
-        XCTAssertEqual(store.copyPresets.first?.name, "Chris")
+        XCTAssertEqual(store.copyPresets.first?.name, "Customers")
         store.copyOrder = [.date, .time24]
         XCTAssertTrue(store.saveCopyPreset(name: "Work"))
         XCTAssertEqual(store.copyPresets.count, 2)
-        let chrisID = store.copyPresets.first(where: { $0.name == "Chris" })!.id
-        store.applyCopyPreset(id: chrisID)
+        let custID = store.copyPresets.first(where: { $0.name == "Customers" })!.id
+        store.applyCopyPreset(id: custID)
         XCTAssertEqual(store.copyOrder, [.city, .date, .time12, .abbr])
-        store.deleteCopyPreset(id: chrisID)
+        store.deleteCopyPreset(id: custID)
         XCTAssertEqual(store.copyPresets.count, 1)
         XCTAssertFalse(store.saveCopyPreset(name: "   "))
     }
@@ -125,9 +125,9 @@ final class TimeStoreTests: XCTestCase {
     func testCopyPresetOverwriteSameName() {
         let store = makeStore(baseDate: Date())
         store.copyOrder = [.city, .date]
-        XCTAssertTrue(store.saveCopyPreset(name: "Chris"))
+        XCTAssertTrue(store.saveCopyPreset(name: "Customers"))
         store.copyOrder = [.date, .time24]
-        XCTAssertTrue(store.saveCopyPreset(name: "chris"))
+        XCTAssertTrue(store.saveCopyPreset(name: "customers"))
         XCTAssertEqual(store.copyPresets.count, 1)
         XCTAssertEqual(store.copyPresets.first?.tokens, [.date, .time24])
     }
@@ -149,6 +149,16 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Seoul"), "Asia/Seoul")
         XCTAssertNil(TimeStore.suggestedTimeZoneID(forCity: "NarniaXYZ"))
         XCTAssertNil(TimeStore.suggestedTimeZoneID(forCity: "   "))
+    }
+
+    func testCityGuessExpanded() {
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Toledo"), "America/New_York")
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Toledo, Ohio"), "America/New_York")
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Moscow"), "Europe/Moscow")
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Tehran"), "Asia/Tehran")
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Frankfurt"), "Europe/Berlin")
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Frankfurt am Main"), "Europe/Berlin")
+        XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "America/Chicago"), "America/Chicago")
     }
 
     func testCustomZoneAddRemove() {

@@ -341,15 +341,31 @@ struct SettingsView: View {
                 } else {
                     VStack(spacing: 2) {
                         ForEach(store.copyPresets) { preset in
+                            let isActive = store.copyOrder == preset.tokens
                             HStack(spacing: 8) {
+                                Button("Apply") {
+                                    store.applyCopyPreset(id: preset.id)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .help("Apply preset \(preset.name)")
                                 Button {
                                     store.applyCopyPreset(id: preset.id)
                                 } label: {
                                     Text(preset.name)
                                         .font(.system(size: 12, weight: .medium))
                                 }
-                                .buttonStyle(.link)
-                                .help("Apply this preset")
+                                .buttonStyle(.plain)
+                                .help("Apply preset \(preset.name)")
+                                if isActive {
+                                    Text("Active")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.accentColor)
+                                        .clipShape(Capsule())
+                                }
                                 Spacer()
                                 Text(preset.tokens.map { $0.example }.joined(separator: " "))
                                     .font(.system(size: 10).monospacedDigit())
@@ -367,7 +383,7 @@ struct SettingsView: View {
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                            .background(isActive ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor).opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                     }
