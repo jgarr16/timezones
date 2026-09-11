@@ -3,7 +3,6 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var store: TimeStore
-    @Environment(\.openWindow) private var openWindow
     @State private var didCopy: Bool = false
 
     var body: some View {
@@ -96,14 +95,8 @@ struct ContentView: View {
                 .keyboardShortcut("m", modifiers: .command)
                 .help("Copy selected rows, one per line (Cmd+M)")
                 Spacer()
-                Button("Settings") {
-                    openWindow(id: "settings")
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
-                .frame(width: 50, alignment: .trailing)
-                .frame(width: 60, alignment: .trailing)
+                Color.clear
+                    .frame(width: 60, height: 1)
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
@@ -126,7 +119,7 @@ struct ContentView: View {
     }
 
     private func clearFocus() {
-        // MenuBarExtra window keeps TextField focus otherwise,
+        // Popover window keeps TextField focus otherwise,
         // which blocks sync and leaves stale minutes visible.
         NSApplication.shared.keyWindow?.makeFirstResponder(nil)
     }

@@ -1,21 +1,29 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @main
 struct timezonesApp: App {
-    @StateObject private var store = TimeStore()
+    @StateObject private var store: TimeStore
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    init() {
+        let s = TimeStore()
+        _store = StateObject(wrappedValue: s)
+        AppDelegate.pendingStore = s
+        if let inst = AppDelegate.instance {
+            inst.store = s
+        }
+    }
 
     var body: some Scene {
-        MenuBarExtra {
-            ContentView(store: store)
-        } label: {
-            MenuBarLabelView(store: store)
-        }
-        .menuBarExtraStyle(.window)
-
         Window("Timezones", id: "main") {
-            ContentView(store: store)
-                .frame(minWidth: 440, minHeight: 200)
+            VStack(spacing: 0) {
+                ContentView(store: store)
+                OpenWindowInjector()
+                    .frame(width: 0, height: 0)
+            }
+            .frame(minWidth: 440, minHeight: 200)
         }
         .windowResizability(.contentSize)
 
@@ -27,22 +35,181 @@ struct timezonesApp: App {
     }
 }
 
-struct MenuBarLabelView: View {
-    @ObservedObject var store: TimeStore
+struct OpenWindowInjector: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text(store.menuBarText)
-            .font(.system(size: 13).monospacedDigit())
-            .contextMenu {
-                Button("Settings...") {
-                    openWindow(id: "settings")
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-                Divider()
-                Button("Quit Timezones") {
-                    NSApplication.shared.terminate(nil)
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {
+                AppDelegate.instance?.openWindowAction = { id in
+                    openWindow(id: id)
                 }
             }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    static var instance: AppDelegate?
+    static var pendingStore: TimeStore?
+
+    var store: TimeStore?
+    var openWindowAction: ((String) -> Void)?
+
+    private var statusItem: NSStatusItem?
+    private var popover: NSPopover?
+    private var cancellables = Set<AnyCancellable>()
+
+    override init() {
+        super.init()
+        AppDelegate.instance = self
+        if store == nil {
+            store = AppDelegate.pendingStore
+        }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        if store == nil {
+            store = AppDelegate.pendingStore
+        }
+        guard let store else { return }
+        setupStatusItem(store: store)
+        setupPopover(store: store)
+        observeMenuBarText(store: store)
+    }
+
+    private func setupStatusItem(store: TimeStore) {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.isVisible = true
+        if let button = item.button {
+            button.title = store.menuBarText
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+            button.target = self
+            button.action = #selector(handleStatusClick(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.toolTip = "Timezones - click for times, right-click for Settings / Quit"
+        }
+        self.statusItem = item
+    }
+
+    private func setupPopover(store: TimeStore) {
+        let p = NSPopover()
+        p.contentSize = NSSize(width: 430, height: 320)
+        p.behavior = .transient
+        p.animates = true
+        p.contentViewController = NSHostingController(rootView: ContentView(store: store))
+        self.popover = p
+    }
+
+    private func observeMenuBarText(store: TimeStore) {
+        store.$liveNow
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateTitle()
+            }
+            .store(in: &cancellables)
+        updateTitle()
+    }
+
+    private func updateTitle() {
+        guard let store, let button = statusItem?.button else { return }
+        let text = store.menuBarText
+        if button.title != text {
+            button.title = text
+        }
+    }
+
+    @objc private func handleStatusClick(_ sender: NSStatusBarButton) {
+        guard let event = NSApp.currentEvent else {
+            togglePopover()
+            return
+        }
+        if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+            showContextMenu(for: sender)
+        } else {
+            togglePopover()
+        }
+    }
+
+    private func togglePopover() {
+        guard let button = statusItem?.button, let popover else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private func showContextMenu(for button: NSStatusBarButton) {
+        popover?.performClose(nil)
+        let menu = makeContextMenu()
+        if let event = NSApp.currentEvent {
+            NSMenu.popUpContextMenu(menu, with: event, for: button)
+        } else {
+            statusItem?.menu = menu
+            button.performClick(nil)
+            statusItem?.menu = nil
+        }
+    }
+
+    private func makeContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        let center = NSMutableParagraphStyle()
+        center.alignment = .center
+
+        let titleItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        titleItem.attributedTitle = NSAttributedString(
+            string: "TimeZones",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+                .paragraphStyle: center
+            ]
+        )
+        titleItem.isEnabled = false
+        menu.addItem(titleItem)
+
+        let subItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        subItem.attributedTitle = NSAttributedString(
+            string: "by GarrigAI LLC",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: center
+            ]
+        )
+        subItem.isEnabled = false
+        menu.addItem(subItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let quitItem = NSMenuItem(title: "Quit Timezones", action: #selector(quitApp), keyEquivalent: "")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        return menu
+    }
+
+    @objc private func openSettings() {
+        if let action = openWindowAction {
+            action("settings")
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            for window in NSApp.windows where window.title == "Settings" {
+                window.makeKeyAndOrderFront(nil)
+                return
+            }
+        }
+    }
+
+    @objc private func quitApp() {
+        NSApplication.shared.terminate(nil)
     }
 }
