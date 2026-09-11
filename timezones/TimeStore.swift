@@ -120,7 +120,7 @@ struct ZoneDef: Identifiable, Hashable {
                 if timeZone.identifier == "Asia/Seoul" { return "KST" }
                 if timeZone.identifier == "Asia/Tokyo" { return "JST" }
                 if timeZone.identifier == "Asia/Dubai" { return "GST" }
-                if timeZone.identifier == "Asia/Shanghai" { return "GMT+8" }
+                if timeZone.identifier == "Asia/Shanghai" { return "CST" }
             }
             return abbr
         }
@@ -129,7 +129,7 @@ struct ZoneDef: Identifiable, Hashable {
         if id == "tokyo" { return "JST" }
         if id == "dubai" { return "GST" }
         if id == "honolulu" { return "HST" }
-        if timeZone.identifier == "Asia/Shanghai" { return "GMT+8" }
+        if timeZone.identifier == "Asia/Shanghai" { return "CST" }
         if timeZone.identifier == "Asia/Seoul" { return "KST" }
         if timeZone.identifier == "Asia/Tokyo" { return "JST" }
         let abbr = timeZone.abbreviation(for: date) ?? ""
