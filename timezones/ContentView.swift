@@ -39,8 +39,6 @@ struct ContentView: View {
                             minute: hm.m,
                             onHourChanged: { newHour in
                                 DispatchQueue.main.async {
-                                    // Re-read current minute at call time to avoid
-                                    // stale capture overwriting a minute edit.
                                     let cur = store.hourMinute(for: store.baseDate, in: zone.timeZone)
                                     store.setTime(for: zone, newHour: newHour, newMinute: cur.m)
                                 }
@@ -122,8 +120,6 @@ struct ContentView: View {
     }
 
     private func clearFocus() {
-        // Popover window keeps TextField focus otherwise,
-        // which blocks sync and leaves stale minutes visible.
         NSApplication.shared.keyWindow?.makeFirstResponder(nil)
     }
 }
@@ -134,6 +130,9 @@ struct TimeScrubberView: View {
     @State private var lastStepCount: Int = 0
     @State private var isDragging: Bool = false
     @State private var repeatTimer: Timer?
+    @State private var isHovering: Bool = false
+    @State private var scrollAccum: CGFloat = 0
+    @State private var scrollMonitor: Any?
 
     private let trackHeight: CGFloat = 180
     private let maxDrag: CGFloat = 85
@@ -141,17 +140,16 @@ struct TimeScrubberView: View {
     var body: some View {
         VStack(spacing: 4) {
             Button {
-                DispatchQueue.main.async {
-                    store.stepMinute30(for: store.localDef, by: 1)
-                }
+                store.stepMinute30(for: store.localDef, by: 1)
             } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 16)
+                    .frame(width: 28, height: 20)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Step +30 min (snaps to :00 / :30 first)")
+            .help("Step +30 min (snaps to :00 / :30 first, then +30m)")
 
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
@@ -163,23 +161,28 @@ struct TimeScrubberView: View {
                     .frame(width: 28, height: trackHeight)
 
                 Rectangle()
-                    .fill(Color.secondary.opacity(0.6))
+                    .fill(Color.secondary.opacity(0.5))
                     .frame(width: 28, height: 1)
-                    .offset(y: 0)
 
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color.accentColor.opacity(isDragging ? 0.9 : 0.6))
+                    .fill(Color.accentColor.opacity(isDragging ? 0.85 : 0.55))
                     .frame(width: 22, height: 14)
                     .offset(y: translation)
                     .animation(isDragging ? nil : .easeOut(duration: 0.15), value: translation)
 
                 if !isDragging {
-                    Image(systemName: "chevrons.up.chevrons.down")
+                    Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary.opacity(0.7))
                 }
             }
             .contentShape(Rectangle())
+            .onHover { hovering in
+                isHovering = hovering
+                if !hovering {
+                    scrollAccum = 0
+                }
+            }
             .gesture(
                 DragGesture(minimumDistance: 2)
                     .onChanged { value in
@@ -208,28 +211,31 @@ struct TimeScrubberView: View {
                         }
                     }
             )
-            .help("Drag up / down to scrub time. First snaps to nearest :00 / :30 in that direction, then 30-min steps. Farther from center = faster.")
+            .help("Hover and use mouse wheel / two-finger scroll to scrub. Drag up / down to scrub. First snaps to nearest :00 / :30 in that direction, then 30-min steps. Farther from center = faster.")
 
             Button {
-                DispatchQueue.main.async {
-                    store.stepMinute30(for: store.localDef, by: -1)
-                }
+                store.stepMinute30(for: store.localDef, by: -1)
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 16)
+                    .frame(width: 28, height: 20)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Step -30 min (snaps to :00 / :30 first)")
+            .help("Step -30 min (snaps to :00 / :30 first, then -30m)")
 
             Text("30m")
                 .font(.system(size: 9).monospacedDigit())
                 .foregroundStyle(.secondary)
         }
         .frame(width: 32)
+        .onAppear {
+            startScrollMonitor()
+        }
         .onDisappear {
             stopTimer()
+            stopScrollMonitor()
         }
     }
 
@@ -239,6 +245,42 @@ struct TimeScrubberView: View {
             return Int((-t + 6) / 12)
         } else {
             return -Int((t + 6) / 12)
+        }
+    }
+
+    private func handleScrollDelta(_ dy: CGFloat) {
+        scrollAccum += dy
+        let threshold: CGFloat = 15
+        while abs(scrollAccum) >= threshold {
+            if scrollAccum > 0 {
+                store.stepMinute30(for: store.localDef, by: 1)
+                scrollAccum -= threshold
+            } else {
+                store.stepMinute30(for: store.localDef, by: -1)
+                scrollAccum += threshold
+            }
+        }
+    }
+
+    private func startScrollMonitor() {
+        if scrollMonitor != nil { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            guard isHovering else { return event }
+            let dy: CGFloat = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : CGFloat(event.deltaY) * 10.0
+            if dy != 0 {
+                DispatchQueue.main.async {
+                    handleScrollDelta(dy)
+                }
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func stopScrollMonitor() {
+        if let m = scrollMonitor {
+            NSEvent.removeMonitor(m)
+            scrollMonitor = nil
         }
     }
 
