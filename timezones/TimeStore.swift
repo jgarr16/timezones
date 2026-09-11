@@ -15,6 +15,7 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
     case time24
     case abbr
     case offset
+    case gmtParen
 
     var id: String { rawValue }
 
@@ -32,6 +33,7 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
         case .time24: return "Time 24h (08:30)"
         case .abbr: return "Abbreviation (KST)"
         case .offset: return "GMT offset (+9)"
+        case .gmtParen: return "GMT offset in parens ((GMT+8))"
         }
     }
 
@@ -49,6 +51,7 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
         case .time24: return "08:30"
         case .abbr: return "(KST)"
         case .offset: return "+9"
+        case .gmtParen: return "(GMT+8)"
         }
     }
 }
@@ -117,6 +120,7 @@ struct ZoneDef: Identifiable, Hashable {
                 if timeZone.identifier == "Asia/Seoul" { return "KST" }
                 if timeZone.identifier == "Asia/Tokyo" { return "JST" }
                 if timeZone.identifier == "Asia/Dubai" { return "GST" }
+                if timeZone.identifier == "Asia/Shanghai" { return "GMT+8" }
             }
             return abbr
         }
@@ -125,6 +129,9 @@ struct ZoneDef: Identifiable, Hashable {
         if id == "tokyo" { return "JST" }
         if id == "dubai" { return "GST" }
         if id == "honolulu" { return "HST" }
+        if timeZone.identifier == "Asia/Shanghai" { return "GMT+8" }
+        if timeZone.identifier == "Asia/Seoul" { return "KST" }
+        if timeZone.identifier == "Asia/Tokyo" { return "JST" }
         let abbr = timeZone.abbreviation(for: date) ?? ""
         if abbr.hasPrefix("GMT+") || abbr.hasPrefix("GMT-") {
             if id == "paris" { return "CET" }
@@ -146,6 +153,10 @@ struct ZoneDef: Identifiable, Hashable {
         } else {
             return String(format: "%@%d:%02d", sign, hours, mins)
         }
+    }
+
+    func gmtParenString(for date: Date) -> String {
+        return "(GMT\(gmtOffsetString(for: date)))"
     }
 }
 
@@ -1221,6 +1232,8 @@ final class TimeStore: ObservableObject {
             return "(\(zone.abbreviation(for: baseDate)))"
         case .offset:
             return zone.gmtOffsetString(for: baseDate)
+        case .gmtParen:
+            return zone.gmtParenString(for: baseDate)
         }
     }
 

@@ -73,6 +73,10 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
 
+                Spacer(minLength: 16)
+
+                Divider()
+
                 HStack(spacing: 8) {
                     Button("Reset") {
                         clearFocus()
@@ -100,6 +104,7 @@ struct ContentView: View {
                 .padding(.horizontal, 4)
                 .padding(.top, 2)
             }
+            .frame(maxHeight: .infinity)
             TimeScrubberView(store: store)
         }
         .padding(10)
