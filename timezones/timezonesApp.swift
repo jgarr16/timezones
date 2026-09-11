@@ -30,7 +30,6 @@ struct timezonesApp: App {
         Window("Settings", id: "settings") {
             VStack(spacing: 0) {
                 SettingsView(store: store)
-                    .frame(minWidth: 280, minHeight: 320)
                 OpenWindowInjector()
                     .frame(width: 0, height: 0)
             }
@@ -107,11 +106,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func closeDetachedWindowAtLaunch() {
-        // The Window(id: main) Scene opens automatically on launch.
-        // macOS also restores the Settings window if it was open at quit.
-        // We want menu-bar popover by default, detached only on demand.
-        // Close immediately and again shortly after to catch restoration.
-        // The brief blip is SwiftUI creating the Window before we can close it.
         func closeLaunchWindows() {
             for window in NSApp.windows where window.title == "Timezones" || window.title == "Settings" {
                 window.close()

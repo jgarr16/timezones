@@ -5,6 +5,12 @@ import AppKit
 enum CopyToken: String, Codable, CaseIterable, Identifiable {
     case city
     case date
+    case dateMDYY
+    case dateMDYYYY
+    case dateISO
+    case monthYear
+    case year2
+    case year4
     case time12
     case time24
     case abbr
@@ -16,6 +22,12 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .city: return "City"
         case .date: return "Date (M/D)"
+        case .dateMDYY: return "Date (M/D/YY)"
+        case .dateMDYYYY: return "Date (M/D/YYYY)"
+        case .dateISO: return "Date ISO (YYYY-MM-DD)"
+        case .monthYear: return "Month/Year (M/YYYY)"
+        case .year2: return "Year (YY)"
+        case .year4: return "Year (YYYY)"
         case .time12: return "Time 12h (08:30AM)"
         case .time24: return "Time 24h (08:30)"
         case .abbr: return "Abbreviation (KST)"
@@ -27,12 +39,24 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .city: return "Seoul"
         case .date: return "9/16"
+        case .dateMDYY: return "9/16/26"
+        case .dateMDYYYY: return "9/16/2026"
+        case .dateISO: return "2026-09-16"
+        case .monthYear: return "9/2026"
+        case .year2: return "26"
+        case .year4: return "2026"
         case .time12: return "08:30AM"
         case .time24: return "08:30"
         case .abbr: return "(KST)"
         case .offset: return "+9"
         }
     }
+}
+
+struct CustomZone: Codable, Hashable, Identifiable {
+    var id: String
+    var city: String
+    var timeZoneID: String
 }
 
 struct ZoneDef: Identifiable, Hashable {
@@ -57,7 +81,6 @@ struct ZoneDef: Identifiable, Hashable {
         if id == "dubai" { return "GST" }
         if id == "honolulu" { return "HST" }
         let abbr = timeZone.abbreviation(for: date) ?? ""
-        // macOS returns GMT+X for some Asian zones, prefer common names.
         if abbr.hasPrefix("GMT+") || abbr.hasPrefix("GMT-") {
             if id == "paris" { return "CET" }
             if id == "sydney" { return "AET" }
@@ -105,6 +128,13 @@ final class TimeStore: ObservableObject {
             userDefaults.set(copyOrder.map { $0.rawValue }, forKey: Self.copyOrderKey)
         }
     }
+    @Published var customZones: [CustomZone] {
+        didSet {
+            if let data = try? JSONEncoder().encode(customZones) {
+                userDefaults.set(data, forKey: Self.customZonesKey)
+            }
+        }
+    }
 
     private var userDefaults: UserDefaults
     private var timerCancellable: AnyCancellable?
@@ -113,6 +143,7 @@ final class TimeStore: ObservableObject {
     static let citiesKey = "customCityNames"
     static let copyKey = "copySelectedIDs"
     static let copyOrderKey = "copyTokenOrder"
+    static let customZonesKey = "customZones"
     static let maxExtras = 8
 
     static let catalog: [ZoneDef] = [
@@ -123,12 +154,7 @@ final class TimeStore: ObservableObject {
         ZoneDef(id: "mountain", title: "Mountain", defaultCity: "Denver", timeZone: TimeZone(identifier: "America/Denver") ?? TimeZone.current),
         ZoneDef(id: "honolulu", title: "Honolulu", defaultCity: "Honolulu", timeZone: TimeZone(identifier: "Pacific/Honolulu") ?? TimeZone.current),
         ZoneDef(id: "london", title: "London", defaultCity: "London", timeZone: TimeZone(identifier: "Europe/London") ?? TimeZone.current),
-        ZoneDef(id: "paris", title: "Paris", defaultCity: "Paris", timeZone: TimeZone(identifier: "Europe/Paris") ?? TimeZone.current),
-        ZoneDef(id: "dubai", title: "Dubai", defaultCity: "Dubai", timeZone: TimeZone(identifier: "Asia/Dubai") ?? TimeZone.current),
-        ZoneDef(id: "seoul", title: "Seoul", defaultCity: "Seoul", timeZone: TimeZone(identifier: "Asia/Seoul") ?? TimeZone.current),
-        ZoneDef(id: "tokyo", title: "Tokyo", defaultCity: "Tokyo", timeZone: TimeZone(identifier: "Asia/Tokyo") ?? TimeZone.current),
-        ZoneDef(id: "sydney", title: "Sydney", defaultCity: "Sydney", timeZone: TimeZone(identifier: "Australia/Sydney") ?? TimeZone.current),
-        ZoneDef(id: "auckland", title: "Auckland", defaultCity: "Auckland", timeZone: TimeZone(identifier: "Pacific/Auckland") ?? TimeZone.current)
+        ZoneDef(id: "seoul", title: "Seoul", defaultCity: "Seoul", timeZone: TimeZone(identifier: "Asia/Seoul") ?? TimeZone.current)
     ]
 
     static let defaultExtras = ["zulu", "central", "eastern", "pacific", "seoul"]
@@ -138,9 +164,17 @@ final class TimeStore: ObservableObject {
         ZoneDef(id: "local", title: "Local", defaultCity: "Local", timeZone: TimeZone.autoupdatingCurrent)
     }
 
+    var allCatalog: [ZoneDef] {
+        let customs: [ZoneDef] = customZones.compactMap { cz in
+            guard let tz = TimeZone(identifier: cz.timeZoneID) else { return nil }
+            return ZoneDef(id: cz.id, title: cz.city, defaultCity: cz.city, timeZone: tz)
+        }
+        return Self.catalog + customs
+    }
+
     var zones: [ZoneDef] {
         let extras = extraIDs.compactMap { id in
-            Self.catalog.first(where: { $0.id == id })
+            allCatalog.first(where: { $0.id == id })
         }
         return [localDef] + extras
     }
@@ -153,6 +187,7 @@ final class TimeStore: ObservableObject {
         customCities: [String: String]? = nil,
         copySelectedIDs: Set<String>? = nil,
         copyOrder: [CopyToken]? = nil,
+        customZones: [CustomZone]? = nil,
         userDefaults: UserDefaults = .standard,
         enableTimer: Bool = true
     ) {
@@ -178,7 +213,6 @@ final class TimeStore: ObservableObject {
         } else {
             self.customCities = (userDefaults.dictionary(forKey: Self.citiesKey) as? [String: String]) ?? [:]
         }
-        // Compute current zone ids for default copy selection without capturing self.
         var currentIDs = Set<String>()
         currentIDs.insert("local")
         for id in resolvedExtraIDs {
@@ -187,7 +221,6 @@ final class TimeStore: ObservableObject {
         if let copySelectedIDs {
             self.copySelectedIDs = copySelectedIDs
         } else if let savedCopy = userDefaults.stringArray(forKey: Self.copyKey) {
-            // Keep only ids that still exist, but don't force-empty.
             let filtered = Set(savedCopy).intersection(currentIDs)
             self.copySelectedIDs = filtered.isEmpty ? currentIDs : filtered
         } else {
@@ -201,12 +234,19 @@ final class TimeStore: ObservableObject {
         } else {
             self.copyOrder = Self.defaultCopyOrder
         }
+        if let customZones {
+            self.customZones = customZones
+        } else if let data = userDefaults.data(forKey: Self.customZonesKey),
+                  let decoded = try? JSONDecoder().decode([CustomZone].self, from: data) {
+            self.customZones = decoded
+        } else {
+            self.customZones = []
+        }
         if enableTimer {
             timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
                 .autoconnect()
                 .sink { [weak self] now in
                     guard let self else { return }
-                    // Always-live clock for menu bar, independent of edits.
                     self.liveNow = now
                     if self.isLive {
                         self.baseDate = now
@@ -261,6 +301,31 @@ final class TimeStore: ObservableObject {
         }
     }
 
+    func isCustomZone(id: String) -> Bool {
+        customZones.contains(where: { $0.id == id })
+    }
+
+    func addCustomZone(city: String, timeZoneID: String) -> Bool {
+        let trimmedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTZ = timeZoneID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCity.isEmpty, !trimmedTZ.isEmpty else { return false }
+        guard TimeZone(identifier: trimmedTZ) != nil else { return false }
+        guard extraIDs.count < Self.maxExtras else { return false }
+        let newID = "custom-" + UUID().uuidString.prefix(8).lowercased()
+        let cz = CustomZone(id: String(newID), city: trimmedCity, timeZoneID: trimmedTZ)
+        customZones.append(cz)
+        extraIDs.append(cz.id)
+        copySelectedIDs.insert(cz.id)
+        return true
+    }
+
+    func removeCustomZone(id: String) {
+        customZones.removeAll(where: { $0.id == id })
+        extraIDs.removeAll(where: { $0 == id })
+        copySelectedIDs.remove(id)
+        customCities.removeValue(forKey: id)
+    }
+
     func isCopySelected(id: String) -> Bool {
         copySelectedIDs.contains(id)
     }
@@ -298,6 +363,12 @@ final class TimeStore: ObservableObject {
 
     func resetCopyFormat() {
         copyOrder = Self.defaultCopyOrder
+    }
+
+    func orderedTokensForDisplay() -> [CopyToken] {
+        let enabled = copyOrder
+        let disabled = CopyToken.allCases.filter { !enabled.contains($0) }
+        return enabled + disabled
     }
 
     func calendar(for timeZone: TimeZone) -> Calendar {
@@ -348,7 +419,6 @@ final class TimeStore: ObservableObject {
         comps.second = 0
         comps.nanosecond = 0
         guard let newDate = cal.date(from: comps) else { return }
-        // Reject overflow normalization (e.g. Feb 30 -> Mar 2).
         let check = cal.dateComponents([.year, .month, .day], from: newDate)
         guard check.year == year, check.month == month, check.day == day else { return }
         baseDate = newDate
@@ -423,7 +493,6 @@ final class TimeStore: ObservableObject {
                 newH = hm.h
                 newM = 30
             } else {
-                // 31...59 -> next hour 00
                 if hm.h == 23 {
                     newH = 0
                     newM = 0
@@ -448,7 +517,6 @@ final class TimeStore: ObservableObject {
                 newH = hm.h
                 newM = 30
             } else {
-                // 1...29 -> :00 same hour
                 newH = hm.h
                 newM = 0
             }
@@ -483,17 +551,28 @@ final class TimeStore: ObservableObject {
         f.timeZone = timeZone
         f.locale = Locale(identifier: "en_US")
         f.dateFormat = "hh:mm a"
-        // 08:30AM style: uppercase, no space.
         return f.string(from: date).replacingOccurrences(of: " ", with: "").uppercased()
     }
 
     func tokenString(for token: CopyToken, zone: ZoneDef) -> String {
+        let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
         switch token {
         case .city:
             return cityName(for: zone)
         case .date:
-            let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
             return "\(ymd.m)/\(ymd.d)"
+        case .dateMDYY:
+            return "\(ymd.m)/\(ymd.d)/\(String(format: "%02d", ymd.y % 100))"
+        case .dateMDYYYY:
+            return "\(ymd.m)/\(ymd.d)/\(ymd.y)"
+        case .dateISO:
+            return String(format: "%04d-%02d-%02d", ymd.y, ymd.m, ymd.d)
+        case .monthYear:
+            return "\(ymd.m)/\(ymd.y)"
+        case .year2:
+            return String(format: "%02d", ymd.y % 100)
+        case .year4:
+            return "\(ymd.y)"
         case .time12:
             return twelveHour(for: baseDate, in: zone.timeZone)
         case .time24:

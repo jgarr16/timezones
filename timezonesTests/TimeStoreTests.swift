@@ -51,10 +51,7 @@ final class TimeStoreTests: XCTestCase {
         ZoneDef(id: "central", title: "Central", defaultCity: "Chicago", timeZone: chicago)
     }
 
-    // MARK: - Bidirectional sync (your reported bug)
-
     func testKST10amIsPriorEveningInCentral() {
-        // 10:00 Sep 11 KST = 01:00 Sep 11 UTC = 20:00 Sep 10 CDT (UTC-5 in Sept).
         let kst10 = dateIn(seoul, y: 2026, m: 9, d: 11, h: 10, min: 0)
         let store = makeStore(baseDate: kst10)
         let centralYMD = store.yearMonthDay(for: store.baseDate, in: chicago)
@@ -69,7 +66,6 @@ final class TimeStoreTests: XCTestCase {
         let start = dateIn(utc, y: 2026, m: 9, d: 10, h: 12, min: 0)
         let store = makeStore(baseDate: start)
         store.setTime(for: gmtZone(), newHour: 9, newMinute: 0)
-        // GMT 09:00 -> KST 18:00 same day, Central 04:00 same day (CDT).
         XCTAssertEqual(store.hourMinute(for: store.baseDate, in: utc).h, 9)
         XCTAssertEqual(store.hourMinute(for: store.baseDate, in: seoul).h, 18)
         XCTAssertEqual(store.hourMinute(for: store.baseDate, in: seoul).m, 0)
@@ -110,8 +106,6 @@ final class TimeStoreTests: XCTestCase {
         store.setDate(for: gmtZone(), year: 2026, month: 2, day: 30)
         XCTAssertEqual(store.baseDate, before)
     }
-
-    // MARK: - Arrow stepping
 
     func testStepHourRollsDay() {
         let start = dateIn(utc, y: 2026, m: 9, d: 10, h: 23, min: 15)
@@ -181,7 +175,6 @@ final class TimeStoreTests: XCTestCase {
     }
 
     func testStepMonthClampsDay() {
-        // Jan 31 -> Feb clamps to Feb 28 (2026 not leap).
         let start = dateIn(utc, y: 2026, m: 1, d: 31, h: 12, min: 0)
         let store = makeStore(baseDate: start)
         store.stepMonth(for: gmtZone(), by: 1)
@@ -200,8 +193,6 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(ymd.d, 15)
     }
 
-    // MARK: - Month length
-
     func testMonthLengthFebLeapAndNonLeap() {
         XCTAssertEqual(TimeStore.monthLength(year: 2024, month: 2, timeZone: utc), 29)
         XCTAssertEqual(TimeStore.monthLength(year: 2026, month: 2, timeZone: utc), 28)
@@ -209,15 +200,11 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(TimeStore.monthLength(year: 2026, month: 10, timeZone: utc), 31)
     }
 
-    // MARK: - Offsets and names
-
     func testGmtOffsetStrings() {
         let d = dateIn(utc, y: 2026, m: 9, d: 10, h: 12, min: 0)
         XCTAssertEqual(seoulZone().gmtOffsetString(for: d), "+9")
         XCTAssertEqual(gmtZone().gmtOffsetString(for: d), "+0")
-        // Chicago in September is CDT = -5.
         XCTAssertEqual(centralZone().gmtOffsetString(for: d), "-5")
-        // Chicago in January is CST = -6.
         let jan = dateIn(utc, y: 2026, m: 1, d: 10, h: 12, min: 0)
         XCTAssertEqual(centralZone().gmtOffsetString(for: jan), "-6")
     }
@@ -245,8 +232,6 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.displayName(for: gmtZone()), "GMT")
     }
 
-    // MARK: - City names
-
     func testCityDefaults() {
         let store = makeStore(baseDate: Date())
         XCTAssertEqual(store.cityName(for: store.localDef), "Local")
@@ -261,10 +246,7 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.cityName(for: centralZone()), "Chicago")
     }
 
-    // MARK: - Copy format: City M/D hh:mmAM (ABBR)
-
     func testCopyLineFormat() {
-        // 9/11 17:00 KST -> Seoul 9/11 05:00PM (KST).
         let base = dateIn(seoul, y: 2026, m: 9, d: 11, h: 17, min: 0)
         let store = makeStore(baseDate: base, extraIDs: ["seoul"])
         let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
@@ -308,21 +290,16 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.twelveHour(for: base, in: utc), "07:00PM")
     }
 
-    // MARK: - Menu bar stays live
-
     func testMenuBarUsesLiveNowNotBaseDate() {
         let editedBase = dateIn(utc, y: 2026, m: 1, d: 1, h: 0, min: 0)
         let live = dateIn(utc, y: 2026, m: 9, d: 10, h: 12, min: 34)
         let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
         let store = TimeStore(baseDate: editedBase, liveNow: live, isLive: false, extraIDs: [], userDefaults: ud, enableTimer: false)
-        // Menu bar is 24h HH:mm with M/d prefix, from liveNow.
         XCTAssertTrue(store.menuBarText.contains(":"))
         XCTAssertFalse(store.menuBarText.lowercased().contains("am"))
         XCTAssertFalse(store.menuBarText.lowercased().contains("pm"))
-        // Editing baseDate must not change menu bar.
         store.setTime(for: gmtZone(), newHour: 5, newMinute: 5)
-        XCTAssertEqual(store.baseDate, store.baseDate) // edited
-        // menuBarText still derived from liveNow.
+        XCTAssertEqual(store.baseDate, store.baseDate)
         let expectedYMD = store.yearMonthDay(for: live, in: store.localDef.timeZone)
         XCTAssertTrue(store.menuBarText.hasPrefix("\(expectedYMD.m)/\(expectedYMD.d) "))
     }
@@ -335,8 +312,6 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertTrue(store.isLive)
     }
 
-    // MARK: - Settings selection up to 8, 5 by default
-
     func testDefaultExtrasIsFive() {
         XCTAssertEqual(TimeStore.defaultExtras.count, 5)
         XCTAssertEqual(TimeStore.maxExtras, 8)
@@ -344,13 +319,12 @@ final class TimeStoreTests: XCTestCase {
 
     func testToggleMaxEight() {
         let store = makeStore(baseDate: Date(), extraIDs: [])
-        let ids = ["zulu", "central", "eastern", "pacific", "mountain", "london", "paris", "dubai", "tokyo"]
+        let ids = ["zulu", "central", "eastern", "pacific", "mountain", "honolulu", "london", "seoul"]
         for id in ids {
             store.toggle(id: id)
         }
         XCTAssertEqual(store.extraIDs.count, TimeStore.maxExtras)
-        XCTAssertFalse(store.isSelected(id: "tokyo"))
-        XCTAssertTrue(store.canAddMore() == false)
+        XCTAssertFalse(store.canAddMore())
         store.toggle(id: "zulu")
         XCTAssertFalse(store.isSelected(id: "zulu"))
         XCTAssertTrue(store.canAddMore())
@@ -361,8 +335,6 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.zones.first?.id, "local")
         XCTAssertEqual(store.zones.first?.title, "Local")
     }
-
-    // MARK: - Copy format customization
 
     func testDefaultCopyOrder() {
         XCTAssertEqual(TimeStore.defaultCopyOrder, [.city, .date, .time12, .abbr])
@@ -398,6 +370,30 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30 +9")
     }
 
+    func testYearTokens() {
+        let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
+        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
+        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        store.copyOrder = [.city, .date, .year2]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 26")
+        store.copyOrder = [.city, .date, .year4]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 2026")
+    }
+
+    func testDateVariantTokens() {
+        let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
+        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
+        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        store.copyOrder = [.city, .dateMDYY, .time12]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16/26 08:30AM")
+        store.copyOrder = [.city, .dateMDYYYY, .time12]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16/2026 08:30AM")
+        store.copyOrder = [.city, .dateISO, .time12]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 2026-09-16 08:30AM")
+        store.copyOrder = [.city, .monthYear, .time12]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/2026 08:30AM")
+    }
+
     func testMoveCopyToken() {
         let store = makeStore(baseDate: Date())
         store.copyOrder = [.city, .date, .time12, .abbr]
@@ -421,5 +417,25 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(s1.copyOrder, [.date, .time12])
         let s2 = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: [], userDefaults: ud, enableTimer: false)
         XCTAssertEqual(s2.copyOrder, [.date, .time12])
+    }
+
+    func testCustomZoneAddRemove() {
+        let store = makeStore(baseDate: Date(), extraIDs: [])
+        XCTAssertTrue(store.addCustomZone(city: "Berlin", timeZoneID: "Europe/Berlin"))
+        XCTAssertEqual(store.allCatalog.count, TimeStore.catalog.count + 1)
+        XCTAssertTrue(store.isSelected(id: store.customZones.first!.id))
+        XCTAssertFalse(store.addCustomZone(city: "Bad", timeZoneID: "Not/AZone"))
+        let id = store.customZones.first!.id
+        store.removeCustomZone(id: id)
+        XCTAssertTrue(store.customZones.isEmpty)
+        XCTAssertFalse(store.isSelected(id: id))
+    }
+
+    func testOrderedTokensForDisplay() {
+        let store = makeStore(baseDate: Date())
+        store.copyOrder = [.date, .city]
+        let display = store.orderedTokensForDisplay()
+        XCTAssertEqual(Array(display.prefix(2)), [.date, .city])
+        XCTAssertEqual(display.count, CopyToken.allCases.count)
     }
 }
