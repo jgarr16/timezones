@@ -13,7 +13,7 @@ final class TimeStoreTests: XCTestCase {
         chicago = TimeZone(identifier: "America/Chicago")!
     }
 
-    private func makeStore(baseDate: Date, extraIDs: [String] = ["zulu", "central"]) -> TimeStore {
+    private func makeStore(baseDate: Date, extraIDs: [String] = []) -> TimeStore {
         let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
         return TimeStore(
             baseDate: baseDate,
@@ -49,6 +49,14 @@ final class TimeStoreTests: XCTestCase {
 
     private func centralZone() -> ZoneDef {
         ZoneDef(id: "central", title: "Central", defaultCity: "Chicago", timeZone: chicago)
+    }
+
+    func testCatalogIsEmptyLocalOnlyByDefault() {
+        XCTAssertTrue(TimeStore.catalog.isEmpty)
+        XCTAssertTrue(TimeStore.defaultExtras.isEmpty)
+        let store = makeStore(baseDate: Date())
+        XCTAssertEqual(store.zones.count, 1)
+        XCTAssertEqual(store.zones.first?.id, "local")
     }
 
     func testKST10amIsPriorEveningInCentral() {
@@ -248,27 +256,26 @@ final class TimeStoreTests: XCTestCase {
 
     func testCopyLineFormat() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 11, h: 17, min: 0)
-        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
-        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/11 05:00PM (KST)")
-        XCTAssertFalse(store.copyLine(for: seoulDef).contains("Here's"))
-        XCTAssertFalse(store.copyLine(for: seoulDef).contains("+9"))
+        let store = makeStore(baseDate: base)
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/11 05:00PM (KST)")
+        XCTAssertFalse(store.copyLine(for: seoulZone()).contains("Here's"))
+        XCTAssertFalse(store.copyLine(for: seoulZone()).contains("+9"))
     }
 
     func testCopySentenceHasNoHeresThe() {
         let base = dateIn(chicago, y: 2026, m: 9, d: 14, h: 19, min: 0)
-        let store = makeStore(baseDate: base, extraIDs: ["central"])
-        let central = TimeStore.catalog.first(where: { $0.id == "central" })!
-        let s = store.copySentence(for: central)
-        XCTAssertEqual(s, store.copyLine(for: central))
+        let store = makeStore(baseDate: base)
+        let s = store.copySentence(for: centralZone())
+        XCTAssertEqual(s, store.copyLine(for: centralZone()))
         XCTAssertFalse(s.lowercased().contains("here's"))
     }
 
     func testClipboardTextOnePerRow() {
         let base = dateIn(utc, y: 2026, m: 9, d: 11, h: 8, min: 0)
-        let store = makeStore(baseDate: base, extraIDs: ["zulu", "central"])
+        let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let store = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: [], copySelectedIDs: Set(["local"]), userDefaults: ud, enableTimer: false)
         let lines = store.clipboardText.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, store.zones.count)
+        XCTAssertEqual(lines.count, 1)
         for line in lines {
             XCTAssertTrue(line.contains("/"))
             XCTAssertTrue(line.contains("(") && line.contains(")"))
@@ -278,7 +285,7 @@ final class TimeStoreTests: XCTestCase {
     func testClipboardRespectsCopySelection() {
         let base = dateIn(utc, y: 2026, m: 9, d: 11, h: 8, min: 0)
         let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
-        let store = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: ["zulu", "central"], copySelectedIDs: Set(["local"]), userDefaults: ud, enableTimer: false)
+        let store = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: [], copySelectedIDs: Set(["local"]), userDefaults: ud, enableTimer: false)
         let lines = store.clipboardText.components(separatedBy: "\n")
         XCTAssertEqual(lines.count, 1)
         XCTAssertTrue(lines[0].hasPrefix("Local "))
@@ -312,28 +319,40 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertTrue(store.isLive)
     }
 
-    func testDefaultExtrasIsFive() {
-        XCTAssertEqual(TimeStore.defaultExtras.count, 5)
+    func testDefaultExtrasIsEmpty() {
+        XCTAssertTrue(TimeStore.defaultExtras.isEmpty)
         XCTAssertEqual(TimeStore.maxExtras, 8)
     }
 
     func testToggleMaxEight() {
         let store = makeStore(baseDate: Date(), extraIDs: [])
-        let ids = ["zulu", "central", "eastern", "pacific", "mountain", "honolulu", "london", "seoul"]
-        for id in ids {
-            store.toggle(id: id)
-        }
+        XCTAssertTrue(store.addCustomZone(city: "C1", timeZoneID: "UTC"))
+        XCTAssertTrue(store.addCustomZone(city: "C2", timeZoneID: "America/Chicago"))
+        XCTAssertTrue(store.addCustomZone(city: "C3", timeZoneID: "America/New_York"))
+        XCTAssertTrue(store.addCustomZone(city: "C4", timeZoneID: "America/Los_Angeles"))
+        XCTAssertTrue(store.addCustomZone(city: "C5", timeZoneID: "America/Denver"))
+        XCTAssertTrue(store.addCustomZone(city: "C6", timeZoneID: "Pacific/Honolulu"))
+        XCTAssertTrue(store.addCustomZone(city: "C7", timeZoneID: "Europe/London"))
+        XCTAssertTrue(store.addCustomZone(city: "C8", timeZoneID: "Asia/Seoul"))
         XCTAssertEqual(store.extraIDs.count, TimeStore.maxExtras)
         XCTAssertFalse(store.canAddMore())
-        store.toggle(id: "zulu")
-        XCTAssertFalse(store.isSelected(id: "zulu"))
-        XCTAssertTrue(store.canAddMore())
+        XCTAssertFalse(store.addCustomZone(city: "C9", timeZoneID: "Asia/Tokyo"))
     }
 
     func testZonesAlwaysStartsWithLocal() {
-        let store = makeStore(baseDate: Date(), extraIDs: ["central"])
+        let store = makeStore(baseDate: Date())
+        XCTAssertTrue(store.addCustomZone(city: "Chicago", timeZoneID: "America/Chicago"))
         XCTAssertEqual(store.zones.first?.id, "local")
         XCTAssertEqual(store.zones.first?.title, "Local")
+    }
+
+    func testLegacyMigration() {
+        let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let base = dateIn(utc, y: 2026, m: 9, d: 11, h: 8, min: 0)
+        let store = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: ["central", "seoul"], userDefaults: ud, enableTimer: false)
+        XCTAssertTrue(store.isCustomZone(id: "central"))
+        XCTAssertTrue(store.isCustomZone(id: "seoul"))
+        XCTAssertEqual(store.zones.count, 3)
     }
 
     func testDefaultCopyOrder() {
@@ -344,54 +363,49 @@ final class TimeStoreTests: XCTestCase {
 
     func testCopyOrderReorderChangesOutput() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
-        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
-        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30AM (KST)")
+        let store = makeStore(baseDate: base)
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16 08:30AM (KST)")
         store.copyOrder = [.date, .time12, .city, .abbr]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "9/16 08:30AM Seoul (KST)")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "9/16 08:30AM Seoul (KST)")
     }
 
     func testCopyTokenDeselectRemovesPart() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
-        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
-        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        let store = makeStore(baseDate: base)
         store.toggleCopyToken(.abbr)
         XCTAssertFalse(store.isCopyTokenEnabled(.abbr))
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30AM")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16 08:30AM")
         store.toggleCopyToken(.time24)
-        XCTAssertTrue(store.copyLine(for: seoulDef).contains("08:30"))
+        XCTAssertTrue(store.copyLine(for: seoulZone()).contains("08:30"))
     }
 
     func testCopyTime24AndOffsetTokens() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
-        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
-        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        let store = makeStore(baseDate: base)
         store.copyOrder = [.city, .date, .time24, .offset]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30 +9")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16 08:30 +9")
     }
 
     func testYearTokens() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
-        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
-        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        let store = makeStore(baseDate: base)
         store.copyOrder = [.city, .date, .year2]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 26")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16 26")
         store.copyOrder = [.city, .date, .year4]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 2026")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16 2026")
     }
 
     func testDateVariantTokens() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
-        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
-        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        let store = makeStore(baseDate: base)
         store.copyOrder = [.city, .dateMDYY, .time12]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16/26 08:30AM")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16/26 08:30AM")
         store.copyOrder = [.city, .dateMDYYYY, .time12]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16/2026 08:30AM")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/16/2026 08:30AM")
         store.copyOrder = [.city, .dateISO, .time12]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 2026-09-16 08:30AM")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 2026-09-16 08:30AM")
         store.copyOrder = [.city, .monthYear, .time12]
-        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/2026 08:30AM")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/2026 08:30AM")
     }
 
     func testMoveCopyToken() {
@@ -422,7 +436,7 @@ final class TimeStoreTests: XCTestCase {
     func testCustomZoneAddRemove() {
         let store = makeStore(baseDate: Date(), extraIDs: [])
         XCTAssertTrue(store.addCustomZone(city: "Berlin", timeZoneID: "Europe/Berlin"))
-        XCTAssertEqual(store.allCatalog.count, TimeStore.catalog.count + 1)
+        XCTAssertEqual(store.allCatalog.count, 1)
         XCTAssertTrue(store.isSelected(id: store.customZones.first!.id))
         XCTAssertFalse(store.addCustomZone(city: "Bad", timeZoneID: "Not/AZone"))
         let id = store.customZones.first!.id

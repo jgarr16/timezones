@@ -146,18 +146,25 @@ final class TimeStore: ObservableObject {
     static let customZonesKey = "customZones"
     static let maxExtras = 8
 
-    static let catalog: [ZoneDef] = [
-        ZoneDef(id: "zulu", title: "GMT", defaultCity: "London", timeZone: TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0)!),
-        ZoneDef(id: "central", title: "Central", defaultCity: "Chicago", timeZone: TimeZone(identifier: "America/Chicago") ?? TimeZone.current),
-        ZoneDef(id: "eastern", title: "Eastern", defaultCity: "New York", timeZone: TimeZone(identifier: "America/New_York") ?? TimeZone.current),
-        ZoneDef(id: "pacific", title: "Pacific", defaultCity: "Los Angeles", timeZone: TimeZone(identifier: "America/Los_Angeles") ?? TimeZone.current),
-        ZoneDef(id: "mountain", title: "Mountain", defaultCity: "Denver", timeZone: TimeZone(identifier: "America/Denver") ?? TimeZone.current),
-        ZoneDef(id: "honolulu", title: "Honolulu", defaultCity: "Honolulu", timeZone: TimeZone(identifier: "Pacific/Honolulu") ?? TimeZone.current),
-        ZoneDef(id: "london", title: "London", defaultCity: "London", timeZone: TimeZone(identifier: "Europe/London") ?? TimeZone.current),
-        ZoneDef(id: "seoul", title: "Seoul", defaultCity: "Seoul", timeZone: TimeZone(identifier: "Asia/Seoul") ?? TimeZone.current)
+    static let catalog: [ZoneDef] = []
+
+    private static let legacyDefinitions: [String: (city: String, tzID: String)] = [
+        "zulu": ("London", "UTC"),
+        "central": ("Chicago", "America/Chicago"),
+        "eastern": ("New York", "America/New_York"),
+        "pacific": ("Los Angeles", "America/Los_Angeles"),
+        "mountain": ("Denver", "America/Denver"),
+        "honolulu": ("Honolulu", "Pacific/Honolulu"),
+        "london": ("London", "Europe/London"),
+        "paris": ("Paris", "Europe/Paris"),
+        "dubai": ("Dubai", "Asia/Dubai"),
+        "seoul": ("Seoul", "Asia/Seoul"),
+        "tokyo": ("Tokyo", "Asia/Tokyo"),
+        "sydney": ("Sydney", "Australia/Sydney"),
+        "auckland": ("Auckland", "Pacific/Auckland")
     ]
 
-    static let defaultExtras = ["zulu", "central", "eastern", "pacific", "seoul"]
+    static let defaultExtras: [String] = []
     static let defaultCopyOrder: [CopyToken] = [.city, .date, .time12, .abbr]
 
     var localDef: ZoneDef {
@@ -165,11 +172,10 @@ final class TimeStore: ObservableObject {
     }
 
     var allCatalog: [ZoneDef] {
-        let customs: [ZoneDef] = customZones.compactMap { cz in
+        customZones.compactMap { cz in
             guard let tz = TimeZone(identifier: cz.timeZoneID) else { return nil }
             return ZoneDef(id: cz.id, title: cz.city, defaultCity: cz.city, timeZone: tz)
         }
-        return Self.catalog + customs
     }
 
     var zones: [ZoneDef] {
@@ -207,11 +213,38 @@ final class TimeStore: ObservableObject {
                 resolvedExtraIDs = Self.defaultExtras
             }
         }
-        self.extraIDs = resolvedExtraIDs
+        let resolvedCustomCities: [String: String]
         if let customCities {
-            self.customCities = customCities
+            resolvedCustomCities = customCities
         } else {
-            self.customCities = (userDefaults.dictionary(forKey: Self.citiesKey) as? [String: String]) ?? [:]
+            resolvedCustomCities = (userDefaults.dictionary(forKey: Self.citiesKey) as? [String: String]) ?? [:]
+        }
+        let loadedCustomZones: [CustomZone]
+        if let customZones {
+            loadedCustomZones = customZones
+        } else if let data = userDefaults.data(forKey: Self.customZonesKey),
+                  let decoded = try? JSONDecoder().decode([CustomZone].self, from: data) {
+            loadedCustomZones = decoded
+        } else {
+            loadedCustomZones = []
+        }
+        var migratedCustom = loadedCustomZones
+        for id in resolvedExtraIDs {
+            if migratedCustom.contains(where: { $0.id == id }) { continue }
+            if let leg = Self.legacyDefinitions[id] {
+                let city = resolvedCustomCities[id] ?? leg.city
+                if TimeZone(identifier: leg.tzID) != nil {
+                    migratedCustom.append(CustomZone(id: id, city: city, timeZoneID: leg.tzID))
+                }
+            }
+        }
+        self.extraIDs = resolvedExtraIDs
+        self.customCities = resolvedCustomCities
+        self.customZones = migratedCustom
+        if !migratedCustom.isEmpty && loadedCustomZones.count != migratedCustom.count {
+            if let data = try? JSONEncoder().encode(migratedCustom) {
+                userDefaults.set(data, forKey: Self.customZonesKey)
+            }
         }
         var currentIDs = Set<String>()
         currentIDs.insert("local")
@@ -233,14 +266,6 @@ final class TimeStore: ObservableObject {
             self.copyOrder = parsed.isEmpty ? Self.defaultCopyOrder : parsed
         } else {
             self.copyOrder = Self.defaultCopyOrder
-        }
-        if let customZones {
-            self.customZones = customZones
-        } else if let data = userDefaults.data(forKey: Self.customZonesKey),
-                  let decoded = try? JSONDecoder().decode([CustomZone].self, from: data) {
-            self.customZones = decoded
-        } else {
-            self.customZones = []
         }
         if enableTimer {
             timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
