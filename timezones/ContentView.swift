@@ -94,6 +94,46 @@ struct ContentView: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text("Copy preview")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(previewLineCountText)
+                        .font(.system(size: 10).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+                HStack(alignment: .top, spacing: 8) {
+                    ScrollView {
+                        Text(previewText)
+                            .font(.system(size: 12).monospacedDigit())
+                            .foregroundStyle(store.clipboardText.isEmpty ? .tertiary : .primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                    .frame(height: 64)
+                    .background(Color(nsColor: .textBackgroundColor).opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                    )
+                    Button(didCopy ? "Copied!" : "Copy") {
+                        copyAll()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .frame(width: 64)
+                    .keyboardShortcut("m", modifiers: .command)
+                    .help("Copy previewed rows, one per line (Cmd+M)")
+                    .disabled(store.clipboardText.isEmpty)
+                }
+            }
+            .padding(.horizontal, 4)
+
+            Divider()
+
             HStack(spacing: 8) {
                 Button("Now") {
                     clearFocus()
@@ -106,14 +146,9 @@ struct ContentView: View {
                 .disabled(store.isLive)
                 .frame(width: 60, alignment: .leading)
                 Spacer()
-                Button(didCopy ? "Copied!" : "Copy Selected") {
-                    copyAll()
-                }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
-                .frame(width: 90)
-                .keyboardShortcut("m", modifiers: .command)
-                .help("Copy selected rows, one per line (Cmd+M)")
+                Text(store.isLive ? "Live" : "Paused - editing")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Color.clear
                     .frame(width: 60, height: 1)
@@ -124,6 +159,23 @@ struct ContentView: View {
         .padding(10)
         .frame(minWidth: 340, idealWidth: 380, maxWidth: 480)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var previewText: String {
+        if store.clipboardText.isEmpty {
+            return "Check zones to include in copy."
+        } else {
+            return store.clipboardText
+        }
+    }
+
+    private var previewLineCountText: String {
+        if store.clipboardText.isEmpty {
+            return "0 lines"
+        } else {
+            let n = store.clipboardText.components(separatedBy: "\n").count
+            return n == 1 ? "1 line" : "\(n) lines"
+        }
     }
 
     private func copyAll() {
