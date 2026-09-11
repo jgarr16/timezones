@@ -9,7 +9,15 @@ struct ZoneDef: Identifiable, Hashable {
     let timeZone: TimeZone
 
     func abbreviation(for date: Date) -> String {
-        if id == "local" { return "KST" }
+        if id == "local" {
+            let abbr = timeZone.abbreviation(for: date) ?? "Local"
+            if abbr.hasPrefix("GMT+") || abbr.hasPrefix("GMT-") {
+                if timeZone.identifier == "Asia/Seoul" { return "KST" }
+                if timeZone.identifier == "Asia/Tokyo" { return "JST" }
+                if timeZone.identifier == "Asia/Dubai" { return "GST" }
+            }
+            return abbr
+        }
         if id == "zulu" { return "GMT" }
         if id == "seoul" { return "KST" }
         if id == "tokyo" { return "JST" }
@@ -87,7 +95,7 @@ final class TimeStore: ObservableObject {
     static let defaultExtras = ["zulu", "central", "eastern", "pacific", "seoul"]
 
     var localDef: ZoneDef {
-        ZoneDef(id: "local", title: "KST", defaultCity: "Seoul", timeZone: TimeZone.autoupdatingCurrent)
+        ZoneDef(id: "local", title: "Local", defaultCity: "Local", timeZone: TimeZone.autoupdatingCurrent)
     }
 
     var zones: [ZoneDef] {
@@ -390,7 +398,7 @@ final class TimeStore: ObservableObject {
 
     func displayName(for zone: ZoneDef) -> String {
         if zone.id == "zulu" { return "GMT" }
-        if zone.id == "local" { return "KST" }
+        if zone.id == "local" { return "Local Time" }
         return "\(zone.title) Time"
     }
 

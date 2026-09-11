@@ -8,7 +8,7 @@ struct SettingsView: View {
             Text("Time Zones")
                 .font(.system(size: 14, weight: .semibold))
 
-            Text("KST is always shown. Add up to \(TimeStore.maxExtras) more (\(store.extraIDs.count)/\(TimeStore.maxExtras)).")
+            Text("Local (system time zone) is shown by default. Add up to \(TimeStore.maxExtras) more (\(store.extraIDs.count)/\(TimeStore.maxExtras)).")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
@@ -21,12 +21,14 @@ struct SettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.secondary)
+                Text("Local")
+                    .font(.system(size: 13))
                 TextField("City", text: cityBinding(id: "local", defaultCity: store.localDef.defaultCity))
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 13))
                     .frame(width: 120)
                 Spacer()
-                Text("Always on")
+                Text("Selected by default")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

@@ -226,7 +226,7 @@ final class TimeStoreTests: XCTestCase {
         let d = dateIn(utc, y: 2026, m: 9, d: 10, h: 12, min: 0)
         XCTAssertEqual(gmtZone().abbreviation(for: d), "GMT")
         XCTAssertEqual(seoulZone().abbreviation(for: d), "KST")
-        let local = ZoneDef(id: "local", title: "KST", defaultCity: "Seoul", timeZone: seoul)
+        let local = ZoneDef(id: "local", title: "Local", defaultCity: "Local", timeZone: seoul)
         XCTAssertEqual(local.abbreviation(for: d), "KST")
     }
 
@@ -237,10 +237,11 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(centralZone().abbreviation(for: winter), "CST")
     }
 
-    func testLocalDefIsKST() {
+    func testLocalDefIsLocal() {
         let store = makeStore(baseDate: Date())
-        XCTAssertEqual(store.localDef.title, "KST")
-        XCTAssertEqual(store.displayName(for: store.localDef), "KST")
+        XCTAssertEqual(store.localDef.title, "Local")
+        XCTAssertEqual(store.localDef.defaultCity, "Local")
+        XCTAssertEqual(store.displayName(for: store.localDef), "Local Time")
         XCTAssertEqual(store.displayName(for: gmtZone()), "GMT")
     }
 
@@ -248,7 +249,7 @@ final class TimeStoreTests: XCTestCase {
 
     func testCityDefaults() {
         let store = makeStore(baseDate: Date())
-        XCTAssertEqual(store.cityName(for: store.localDef), "Seoul")
+        XCTAssertEqual(store.cityName(for: store.localDef), "Local")
         XCTAssertEqual(store.cityName(for: centralZone()), "Chicago")
     }
 
@@ -298,7 +299,7 @@ final class TimeStoreTests: XCTestCase {
         let store = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: ["zulu", "central"], copySelectedIDs: Set(["local"]), userDefaults: ud, enableTimer: false)
         let lines = store.clipboardText.components(separatedBy: "\n")
         XCTAssertEqual(lines.count, 1)
-        XCTAssertTrue(lines[0].hasPrefix("Seoul "))
+        XCTAssertTrue(lines[0].hasPrefix("Local "))
     }
 
     func testTwelveHourUppercaseNoSpace() {
@@ -358,6 +359,6 @@ final class TimeStoreTests: XCTestCase {
     func testZonesAlwaysStartsWithLocal() {
         let store = makeStore(baseDate: Date(), extraIDs: ["central"])
         XCTAssertEqual(store.zones.first?.id, "local")
-        XCTAssertEqual(store.zones.first?.title, "KST")
+        XCTAssertEqual(store.zones.first?.title, "Local")
     }
 }
