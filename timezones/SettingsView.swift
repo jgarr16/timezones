@@ -63,6 +63,101 @@ struct SettingsView: View {
                 .opacity(canSelect ? 1.0 : 0.4)
             }
 
+            Divider()
+
+            Text("Copy Format")
+                .font(.system(size: 14, weight: .semibold))
+
+            Text("Choose which parts to include in copies. Drag to reorder, uncheck to hide.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            List {
+                ForEach(store.copyOrder) { token in
+                    HStack(spacing: 8) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 11))
+                        Button {
+                            store.toggleCopyToken(token)
+                        } label: {
+                            Image(systemName: "checkmark.square.fill")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                        Text(token.title)
+                            .font(.system(size: 12))
+                        Spacer()
+                        Text(token.example)
+                            .font(.system(size: 11).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        Button {
+                            store.moveCopyToken(id: token, by: -1)
+                        } label: {
+                            Image(systemName: "chevron.up")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(store.copyOrder.first == token)
+                        Button {
+                            store.moveCopyToken(id: token, by: 1)
+                        } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(store.copyOrder.last == token)
+                    }
+                }
+                .onMove(perform: store.moveCopyTokens)
+            }
+            .listStyle(.plain)
+            .frame(height: CGFloat(40 + store.copyOrder.count * 28))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+
+            Text("Available parts")
+                .font(.system(size: 12, weight: .semibold))
+            ForEach(CopyToken.allCases.filter { !store.isCopyTokenEnabled($0) }) { token in
+                HStack(spacing: 8) {
+                    Button {
+                        store.toggleCopyToken(token)
+                    } label: {
+                        Image(systemName: "square")
+                            .foregroundStyle(Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    Text(token.title)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(token.example)
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+            }
+
+            HStack(spacing: 8) {
+                Text("Preview:")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                if let first = store.zones.first {
+                    Text(store.copyLine(for: first))
+                        .font(.system(size: 12).monospacedDigit())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Button("Reset") {
+                    store.resetCopyFormat()
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+            }
+            .padding(.top, 4)
+
             Spacer()
         }
         .padding(14)

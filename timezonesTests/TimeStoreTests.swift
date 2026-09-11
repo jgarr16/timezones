@@ -361,4 +361,65 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.zones.first?.id, "local")
         XCTAssertEqual(store.zones.first?.title, "Local")
     }
+
+    // MARK: - Copy format customization
+
+    func testDefaultCopyOrder() {
+        XCTAssertEqual(TimeStore.defaultCopyOrder, [.city, .date, .time12, .abbr])
+        let store = makeStore(baseDate: Date())
+        XCTAssertEqual(store.copyOrder, TimeStore.defaultCopyOrder)
+    }
+
+    func testCopyOrderReorderChangesOutput() {
+        let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
+        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
+        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30AM (KST)")
+        store.copyOrder = [.date, .time12, .city, .abbr]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "9/16 08:30AM Seoul (KST)")
+    }
+
+    func testCopyTokenDeselectRemovesPart() {
+        let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
+        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
+        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        store.toggleCopyToken(.abbr)
+        XCTAssertFalse(store.isCopyTokenEnabled(.abbr))
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30AM")
+        store.toggleCopyToken(.time24)
+        XCTAssertTrue(store.copyLine(for: seoulDef).contains("08:30"))
+    }
+
+    func testCopyTime24AndOffsetTokens() {
+        let base = dateIn(seoul, y: 2026, m: 9, d: 16, h: 8, min: 30)
+        let store = makeStore(baseDate: base, extraIDs: ["seoul"])
+        let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
+        store.copyOrder = [.city, .date, .time24, .offset]
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/16 08:30 +9")
+    }
+
+    func testMoveCopyToken() {
+        let store = makeStore(baseDate: Date())
+        store.copyOrder = [.city, .date, .time12, .abbr]
+        store.moveCopyToken(id: .abbr, by: -2)
+        XCTAssertEqual(store.copyOrder, [.city, .abbr, .date, .time12])
+        store.moveCopyTokens(fromOffsets: IndexSet(integer: 0), toOffset: 4)
+        XCTAssertEqual(store.copyOrder.first, .abbr)
+    }
+
+    func testResetCopyFormat() {
+        let store = makeStore(baseDate: Date())
+        store.copyOrder = [.date]
+        store.resetCopyFormat()
+        XCTAssertEqual(store.copyOrder, TimeStore.defaultCopyOrder)
+    }
+
+    func testCopyOrderPersistence() {
+        let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let base = dateIn(utc, y: 2026, m: 9, d: 11, h: 8, min: 0)
+        let s1 = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: [], copyOrder: [.date, .time12], userDefaults: ud, enableTimer: false)
+        XCTAssertEqual(s1.copyOrder, [.date, .time12])
+        let s2 = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: [], userDefaults: ud, enableTimer: false)
+        XCTAssertEqual(s2.copyOrder, [.date, .time12])
+    }
 }

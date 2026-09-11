@@ -2,6 +2,39 @@ import SwiftUI
 import Combine
 import AppKit
 
+enum CopyToken: String, Codable, CaseIterable, Identifiable {
+    case city
+    case date
+    case time12
+    case time24
+    case abbr
+    case offset
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .city: return "City"
+        case .date: return "Date (M/D)"
+        case .time12: return "Time 12h (08:30AM)"
+        case .time24: return "Time 24h (08:30)"
+        case .abbr: return "Abbreviation (KST)"
+        case .offset: return "GMT offset (+9)"
+        }
+    }
+
+    var example: String {
+        switch self {
+        case .city: return "Seoul"
+        case .date: return "9/16"
+        case .time12: return "08:30AM"
+        case .time24: return "08:30"
+        case .abbr: return "(KST)"
+        case .offset: return "+9"
+        }
+    }
+}
+
 struct ZoneDef: Identifiable, Hashable {
     let id: String
     let title: String
@@ -67,6 +100,11 @@ final class TimeStore: ObservableObject {
             userDefaults.set(Array(copySelectedIDs), forKey: Self.copyKey)
         }
     }
+    @Published var copyOrder: [CopyToken] {
+        didSet {
+            userDefaults.set(copyOrder.map { $0.rawValue }, forKey: Self.copyOrderKey)
+        }
+    }
 
     private var userDefaults: UserDefaults
     private var timerCancellable: AnyCancellable?
@@ -74,6 +112,7 @@ final class TimeStore: ObservableObject {
     static let storageKey = "extraZoneIDs"
     static let citiesKey = "customCityNames"
     static let copyKey = "copySelectedIDs"
+    static let copyOrderKey = "copyTokenOrder"
     static let maxExtras = 8
 
     static let catalog: [ZoneDef] = [
@@ -93,6 +132,7 @@ final class TimeStore: ObservableObject {
     ]
 
     static let defaultExtras = ["zulu", "central", "eastern", "pacific", "seoul"]
+    static let defaultCopyOrder: [CopyToken] = [.city, .date, .time12, .abbr]
 
     var localDef: ZoneDef {
         ZoneDef(id: "local", title: "Local", defaultCity: "Local", timeZone: TimeZone.autoupdatingCurrent)
@@ -112,6 +152,7 @@ final class TimeStore: ObservableObject {
         extraIDs: [String]? = nil,
         customCities: [String: String]? = nil,
         copySelectedIDs: Set<String>? = nil,
+        copyOrder: [CopyToken]? = nil,
         userDefaults: UserDefaults = .standard,
         enableTimer: Bool = true
     ) {
@@ -151,6 +192,14 @@ final class TimeStore: ObservableObject {
             self.copySelectedIDs = filtered.isEmpty ? currentIDs : filtered
         } else {
             self.copySelectedIDs = currentIDs
+        }
+        if let copyOrder {
+            self.copyOrder = copyOrder
+        } else if let savedOrder = userDefaults.stringArray(forKey: Self.copyOrderKey) {
+            let parsed = savedOrder.compactMap { CopyToken(rawValue: $0) }
+            self.copyOrder = parsed.isEmpty ? Self.defaultCopyOrder : parsed
+        } else {
+            self.copyOrder = Self.defaultCopyOrder
         }
         if enableTimer {
             timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
@@ -222,6 +271,33 @@ final class TimeStore: ObservableObject {
         } else {
             copySelectedIDs.insert(id)
         }
+    }
+
+    func isCopyTokenEnabled(_ token: CopyToken) -> Bool {
+        copyOrder.contains(token)
+    }
+
+    func toggleCopyToken(_ token: CopyToken) {
+        if copyOrder.contains(token) {
+            copyOrder.removeAll(where: { $0 == token })
+        } else {
+            copyOrder.append(token)
+        }
+    }
+
+    func moveCopyTokens(fromOffsets: IndexSet, toOffset: Int) {
+        copyOrder.move(fromOffsets: fromOffsets, toOffset: toOffset)
+    }
+
+    func moveCopyToken(id: CopyToken, by delta: Int) {
+        guard let idx = copyOrder.firstIndex(of: id) else { return }
+        let newIdx = idx + delta
+        guard newIdx >= 0, newIdx < copyOrder.count else { return }
+        copyOrder.move(fromOffsets: IndexSet(integer: idx), toOffset: newIdx > idx ? newIdx + 1 : newIdx)
+    }
+
+    func resetCopyFormat() {
+        copyOrder = Self.defaultCopyOrder
     }
 
     func calendar(for timeZone: TimeZone) -> Calendar {
@@ -411,12 +487,33 @@ final class TimeStore: ObservableObject {
         return f.string(from: date).replacingOccurrences(of: " ", with: "").uppercased()
     }
 
+    func tokenString(for token: CopyToken, zone: ZoneDef) -> String {
+        switch token {
+        case .city:
+            return cityName(for: zone)
+        case .date:
+            let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
+            return "\(ymd.m)/\(ymd.d)"
+        case .time12:
+            return twelveHour(for: baseDate, in: zone.timeZone)
+        case .time24:
+            return hhmm(for: baseDate, in: zone.timeZone)
+        case .abbr:
+            return "(\(zone.abbreviation(for: baseDate)))"
+        case .offset:
+            return zone.gmtOffsetString(for: baseDate)
+        }
+    }
+
     func copyLine(for zone: ZoneDef) -> String {
-        let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
-        let t = twelveHour(for: baseDate, in: zone.timeZone)
-        let abbr = zone.abbreviation(for: baseDate)
-        let city = cityName(for: zone)
-        return "\(city) \(ymd.m)/\(ymd.d) \(t) (\(abbr))"
+        if copyOrder.isEmpty {
+            let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
+            let t = twelveHour(for: baseDate, in: zone.timeZone)
+            let abbr = zone.abbreviation(for: baseDate)
+            let city = cityName(for: zone)
+            return "\(city) \(ymd.m)/\(ymd.d) \(t) (\(abbr))"
+        }
+        return copyOrder.map { tokenString(for: $0, zone: zone) }.joined(separator: " ")
     }
 
     func copySentence(for zone: ZoneDef) -> String {
