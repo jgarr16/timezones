@@ -12,13 +12,19 @@ struct SettingsView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
+            Text("City names are shown on the left and in copies. Edit to rename.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
             Divider()
 
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.secondary)
-                Text("KST")
+                TextField("City", text: cityBinding(id: "local", defaultCity: store.localDef.defaultCity))
+                    .textFieldStyle(.roundedBorder)
                     .font(.system(size: 13))
+                    .frame(width: 120)
                 Spacer()
                 Text("Always on")
                     .font(.system(size: 11))
@@ -40,8 +46,10 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .disabled(!canSelect)
 
-                    Text(zone.title)
+                    TextField(zone.defaultCity, text: cityBinding(id: zone.id, defaultCity: zone.defaultCity))
+                        .textFieldStyle(.roundedBorder)
                         .font(.system(size: 13))
+                        .frame(width: 120)
                     Spacer()
                     Text(zone.timeZone.identifier)
                         .font(.system(size: 10).monospacedDigit())
@@ -56,6 +64,17 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(14)
-        .frame(width: 300)
+        .frame(width: 340)
+    }
+
+    private func cityBinding(id: String, defaultCity: String) -> Binding<String> {
+        Binding(
+            get: {
+                store.customCities[id] ?? defaultCity
+            },
+            set: { newValue in
+                store.setCityName(id: id, name: newValue)
+            }
+        )
     }
 }

@@ -1,3 +1,4 @@
+// entire file content ...
 import SwiftUI
 import Combine
 import AppKit
@@ -5,6 +6,7 @@ import AppKit
 struct ZoneDef: Identifiable, Hashable {
     let id: String
     let title: String
+    let defaultCity: String
     let timeZone: TimeZone
 
     func abbreviation(for date: Date) -> String {
@@ -48,33 +50,45 @@ final class TimeStore: ObservableObject {
             userDefaults.set(extraIDs, forKey: Self.storageKey)
         }
     }
+    @Published var customCities: [String: String] {
+        didSet {
+            userDefaults.set(customCities, forKey: Self.citiesKey)
+        }
+    }
+    @Published var copySelectedIDs: Set<String> {
+        didSet {
+            userDefaults.set(Array(copySelectedIDs), forKey: Self.copyKey)
+        }
+    }
 
     private var userDefaults: UserDefaults
     private var timerCancellable: AnyCancellable?
 
     static let storageKey = "extraZoneIDs"
+    static let citiesKey = "customCityNames"
+    static let copyKey = "copySelectedIDs"
     static let maxExtras = 5
 
     static let catalog: [ZoneDef] = [
-        ZoneDef(id: "zulu", title: "GMT", timeZone: TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0)!),
-        ZoneDef(id: "central", title: "Central", timeZone: TimeZone(identifier: "America/Chicago") ?? TimeZone.current),
-        ZoneDef(id: "eastern", title: "Eastern", timeZone: TimeZone(identifier: "America/New_York") ?? TimeZone.current),
-        ZoneDef(id: "pacific", title: "Pacific", timeZone: TimeZone(identifier: "America/Los_Angeles") ?? TimeZone.current),
-        ZoneDef(id: "mountain", title: "Mountain", timeZone: TimeZone(identifier: "America/Denver") ?? TimeZone.current),
-        ZoneDef(id: "honolulu", title: "Honolulu", timeZone: TimeZone(identifier: "Pacific/Honolulu") ?? TimeZone.current),
-        ZoneDef(id: "london", title: "London", timeZone: TimeZone(identifier: "Europe/London") ?? TimeZone.current),
-        ZoneDef(id: "paris", title: "Paris", timeZone: TimeZone(identifier: "Europe/Paris") ?? TimeZone.current),
-        ZoneDef(id: "dubai", title: "Dubai", timeZone: TimeZone(identifier: "Asia/Dubai") ?? TimeZone.current),
-        ZoneDef(id: "seoul", title: "Seoul", timeZone: TimeZone(identifier: "Asia/Seoul") ?? TimeZone.current),
-        ZoneDef(id: "tokyo", title: "Tokyo", timeZone: TimeZone(identifier: "Asia/Tokyo") ?? TimeZone.current),
-        ZoneDef(id: "sydney", title: "Sydney", timeZone: TimeZone(identifier: "Australia/Sydney") ?? TimeZone.current),
-        ZoneDef(id: "auckland", title: "Auckland", timeZone: TimeZone(identifier: "Pacific/Auckland") ?? TimeZone.current)
+        ZoneDef(id: "zulu", title: "GMT", defaultCity: "London", timeZone: TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0)!),
+        ZoneDef(id: "central", title: "Central", defaultCity: "Chicago", timeZone: TimeZone(identifier: "America/Chicago") ?? TimeZone.current),
+        ZoneDef(id: "eastern", title: "Eastern", defaultCity: "New York", timeZone: TimeZone(identifier: "America/New_York") ?? TimeZone.current),
+        ZoneDef(id: "pacific", title: "Pacific", defaultCity: "Los Angeles", timeZone: TimeZone(identifier: "America/Los_Angeles") ?? TimeZone.current),
+        ZoneDef(id: "mountain", title: "Mountain", defaultCity: "Denver", timeZone: TimeZone(identifier: "America/Denver") ?? TimeZone.current),
+        ZoneDef(id: "honolulu", title: "Honolulu", defaultCity: "Honolulu", timeZone: TimeZone(identifier: "Pacific/Honolulu") ?? TimeZone.current),
+        ZoneDef(id: "london", title: "London", defaultCity: "London", timeZone: TimeZone(identifier: "Europe/London") ?? TimeZone.current),
+        ZoneDef(id: "paris", title: "Paris", defaultCity: "Paris", timeZone: TimeZone(identifier: "Europe/Paris") ?? TimeZone.current),
+        ZoneDef(id: "dubai", title: "Dubai", defaultCity: "Dubai", timeZone: TimeZone(identifier: "Asia/Dubai") ?? TimeZone.current),
+        ZoneDef(id: "seoul", title: "Seoul", defaultCity: "Seoul", timeZone: TimeZone(identifier: "Asia/Seoul") ?? TimeZone.current),
+        ZoneDef(id: "tokyo", title: "Tokyo", defaultCity: "Tokyo", timeZone: TimeZone(identifier: "Asia/Tokyo") ?? TimeZone.current),
+        ZoneDef(id: "sydney", title: "Sydney", defaultCity: "Sydney", timeZone: TimeZone(identifier: "Australia/Sydney") ?? TimeZone.current),
+        ZoneDef(id: "auckland", title: "Auckland", defaultCity: "Auckland", timeZone: TimeZone(identifier: "Pacific/Auckland") ?? TimeZone.current)
     ]
 
     static let defaultExtras = ["zulu", "central"]
 
     var localDef: ZoneDef {
-        ZoneDef(id: "local", title: "KST", timeZone: TimeZone.autoupdatingCurrent)
+        ZoneDef(id: "local", title: "KST", defaultCity: "Seoul", timeZone: TimeZone.autoupdatingCurrent)
     }
 
     var zones: [ZoneDef] {
@@ -89,6 +103,8 @@ final class TimeStore: ObservableObject {
         liveNow: Date? = nil,
         isLive: Bool = true,
         extraIDs: [String]? = nil,
+        customCities: [String: String]? = nil,
+        copySelectedIDs: Set<String>? = nil,
         userDefaults: UserDefaults = .standard,
         enableTimer: Bool = true
     ) {
@@ -106,6 +122,29 @@ final class TimeStore: ObservableObject {
             } else {
                 self.extraIDs = Self.defaultExtras
             }
+        }
+        if let customCities {
+            self.customCities = customCities
+        } else {
+            self.customCities = (userDefaults.dictionary(forKey: Self.citiesKey) as? [String: String]) ?? [:]
+        }
+        // Compute current zone ids for default copy selection.
+        let currentIDs: Set<String> = {
+            var ids = Set<String>()
+            ids.insert("local")
+            for id in self.extraIDs {
+                ids.insert(id)
+            }
+            return ids
+        }()
+        if let copySelectedIDs {
+            self.copySelectedIDs = copySelectedIDs
+        } else if let savedCopy = userDefaults.stringArray(forKey: Self.copyKey) {
+            // Keep only ids that still exist, but don't force-empty.
+            let filtered = Set(savedCopy).intersection(currentIDs)
+            self.copySelectedIDs = filtered.isEmpty ? currentIDs : filtered
+        } else {
+            self.copySelectedIDs = currentIDs
         }
         if enableTimer {
             timerCancellable = Timer.publish(every: 1.0, on: .main, in: .common)
@@ -131,6 +170,22 @@ final class TimeStore: ObservableObject {
         return "\(ymd.m)/\(ymd.d) \(hm)"
     }
 
+    func cityName(for zone: ZoneDef) -> String {
+        if let custom = customCities[zone.id]?.trimmingCharacters(in: .whitespacesAndNewlines), !custom.isEmpty {
+            return custom
+        }
+        return zone.defaultCity
+    }
+
+    func setCityName(id: String, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            customCities.removeValue(forKey: id)
+        } else {
+            customCities[id] = trimmed
+        }
+    }
+
     func isSelected(id: String) -> Bool {
         extraIDs.contains(id)
     }
@@ -142,10 +197,24 @@ final class TimeStore: ObservableObject {
     func toggle(id: String) {
         if extraIDs.contains(id) {
             extraIDs.removeAll(where: { $0 == id })
+            copySelectedIDs.remove(id)
         } else {
             if extraIDs.count < Self.maxExtras {
                 extraIDs.append(id)
+                copySelectedIDs.insert(id)
             }
+        }
+    }
+
+    func isCopySelected(id: String) -> Bool {
+        copySelectedIDs.contains(id)
+    }
+
+    func toggleCopy(id: String) {
+        if copySelectedIDs.contains(id) {
+            copySelectedIDs.remove(id)
+        } else {
+            copySelectedIDs.insert(id)
         }
     }
 
@@ -331,15 +400,17 @@ final class TimeStore: ObservableObject {
         let f = DateFormatter()
         f.timeZone = timeZone
         f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "h:mm a"
-        return f.string(from: date).lowercased()
+        f.dateFormat = "hh:mm a"
+        // 08:30AM style: uppercase, no space.
+        return f.string(from: date).replacingOccurrences(of: " ", with: "").uppercased()
     }
 
     func copyLine(for zone: ZoneDef) -> String {
         let ymd = yearMonthDay(for: baseDate, in: zone.timeZone)
         let t = twelveHour(for: baseDate, in: zone.timeZone)
         let abbr = zone.abbreviation(for: baseDate)
-        return "\(ymd.m)/\(ymd.d) \(t) (\(abbr))"
+        let city = cityName(for: zone)
+        return "\(city) \(ymd.m)/\(ymd.d) \(t) (\(abbr))"
     }
 
     func copySentence(for zone: ZoneDef) -> String {
@@ -347,7 +418,7 @@ final class TimeStore: ObservableObject {
     }
 
     var clipboardText: String {
-        zones.map { copySentence(for: $0) }.joined(separator: "\n")
+        zones.filter { copySelectedIDs.contains($0.id) }.map { copySentence(for: $0) }.joined(separator: "\n")
     }
 
     func copyAllToClipboard() {

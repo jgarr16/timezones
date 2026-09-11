@@ -11,10 +11,20 @@ struct ContentView: View {
             ForEach(store.zones) { zone in
                 let hm = store.hourMinute(for: store.baseDate, in: zone.timeZone)
                 HStack(spacing: 6) {
-                    Text(zone.title)
+                    Button {
+                        store.toggleCopy(id: zone.id)
+                    } label: {
+                        Image(systemName: store.isCopySelected(id: zone.id) ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(store.isCopySelected(id: zone.id) ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Include in Copy All")
+                    .frame(width: 18)
+                    Text(store.cityName(for: zone))
                         .font(.system(size: 13))
-                        .frame(width: 58, alignment: .leading)
+                        .frame(width: 70, alignment: .leading)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                     DateField(
                         date: store.baseDate,
                         timeZone: zone.timeZone,
@@ -53,23 +63,11 @@ struct ContentView: View {
                         }
                     )
                     .layoutPriority(1)
-                    Text(zone.gmtOffsetString(for: store.baseDate))
+                    Text(zone.abbreviation(for: store.baseDate))
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 32, alignment: .trailing)
+                        .frame(width: 36, alignment: .trailing)
                         .lineLimit(1)
-                    Button {
-                        store.copySingleToClipboard(zone: zone)
-                        didCopy = true
-                        scheduleCopiedReset()
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Copy this row as friendly text")
-                    .frame(width: 18)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -96,7 +94,7 @@ struct ContentView: View {
                 .font(.system(size: 11))
                 .frame(width: 70)
                 .keyboardShortcut("m", modifiers: .command)
-                .help("Copy all rows as friendly text, one per line (Cmd+M)")
+                .help("Copy checked rows, one per line (Cmd+M)")
                 Spacer()
                 Button("Settings") {
                     openWindow(id: "settings")
@@ -111,7 +109,7 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .frame(width: 360)
+        .frame(width: 380)
     }
 
     private func copyAll() {

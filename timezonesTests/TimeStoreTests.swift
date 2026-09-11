@@ -40,15 +40,15 @@ final class TimeStoreTests: XCTestCase {
     }
 
     private func seoulZone() -> ZoneDef {
-        ZoneDef(id: "seoul", title: "Seoul", timeZone: seoul)
+        ZoneDef(id: "seoul", title: "Seoul", defaultCity: "Seoul", timeZone: seoul)
     }
 
     private func gmtZone() -> ZoneDef {
-        ZoneDef(id: "zulu", title: "GMT", timeZone: utc)
+        ZoneDef(id: "zulu", title: "GMT", defaultCity: "London", timeZone: utc)
     }
 
     private func centralZone() -> ZoneDef {
-        ZoneDef(id: "central", title: "Central", timeZone: chicago)
+        ZoneDef(id: "central", title: "Central", defaultCity: "Chicago", timeZone: chicago)
     }
 
     // MARK: - Bidirectional sync (your reported bug)
@@ -226,8 +226,15 @@ final class TimeStoreTests: XCTestCase {
         let d = dateIn(utc, y: 2026, m: 9, d: 10, h: 12, min: 0)
         XCTAssertEqual(gmtZone().abbreviation(for: d), "GMT")
         XCTAssertEqual(seoulZone().abbreviation(for: d), "KST")
-        let local = ZoneDef(id: "local", title: "KST", timeZone: seoul)
+        let local = ZoneDef(id: "local", title: "KST", defaultCity: "Seoul", timeZone: seoul)
         XCTAssertEqual(local.abbreviation(for: d), "KST")
+    }
+
+    func testCentralAbbreviationDST() {
+        let summer = dateIn(utc, y: 2026, m: 9, d: 10, h: 12, min: 0)
+        let winter = dateIn(utc, y: 2026, m: 1, d: 10, h: 12, min: 0)
+        XCTAssertEqual(centralZone().abbreviation(for: summer), "CDT")
+        XCTAssertEqual(centralZone().abbreviation(for: winter), "CST")
     }
 
     func testLocalDefIsKST() {
@@ -237,14 +244,30 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(store.displayName(for: gmtZone()), "GMT")
     }
 
-    // MARK: - Copy format: M/D h:mm a (ABBR), no Here's the, no GMT offset
+    // MARK: - City names
+
+    func testCityDefaults() {
+        let store = makeStore(baseDate: Date())
+        XCTAssertEqual(store.cityName(for: store.localDef), "Seoul")
+        XCTAssertEqual(store.cityName(for: centralZone()), "Chicago")
+    }
+
+    func testCityCustomOverride() {
+        let store = makeStore(baseDate: Date())
+        store.setCityName(id: "central", name: "Austin")
+        XCTAssertEqual(store.cityName(for: centralZone()), "Austin")
+        store.setCityName(id: "central", name: "  ")
+        XCTAssertEqual(store.cityName(for: centralZone()), "Chicago")
+    }
+
+    // MARK: - Copy format: City M/D hh:mmAM (ABBR)
 
     func testCopyLineFormat() {
-        // 9/11 17:00 KST.
+        // 9/11 17:00 KST -> Seoul 9/11 05:00PM (KST).
         let base = dateIn(seoul, y: 2026, m: 9, d: 11, h: 17, min: 0)
         let store = makeStore(baseDate: base, extraIDs: ["seoul"])
         let seoulDef = TimeStore.catalog.first(where: { $0.id == "seoul" })!
-        XCTAssertEqual(store.copyLine(for: seoulDef), "9/11 5:00 pm (KST)")
+        XCTAssertEqual(store.copyLine(for: seoulDef), "Seoul 9/11 05:00PM (KST)")
         XCTAssertFalse(store.copyLine(for: seoulDef).contains("Here's"))
         XCTAssertFalse(store.copyLine(for: seoulDef).contains("+9"))
     }
@@ -264,16 +287,24 @@ final class TimeStoreTests: XCTestCase {
         let lines = store.clipboardText.components(separatedBy: "\n")
         XCTAssertEqual(lines.count, store.zones.count)
         for line in lines {
-            // e.g. 9/11 8:00 am (GMT)
             XCTAssertTrue(line.contains("/"))
             XCTAssertTrue(line.contains("(") && line.contains(")"))
         }
     }
 
-    func testTwelveHourLowercased() {
+    func testClipboardRespectsCopySelection() {
+        let base = dateIn(utc, y: 2026, m: 9, d: 11, h: 8, min: 0)
+        let ud = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let store = TimeStore(baseDate: base, liveNow: base, isLive: false, extraIDs: ["zulu", "central"], copySelectedIDs: Set(["local"]), userDefaults: ud, enableTimer: false)
+        let lines = store.clipboardText.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(lines[0].hasPrefix("Seoul "))
+    }
+
+    func testTwelveHourUppercaseNoSpace() {
         let base = dateIn(utc, y: 2026, m: 9, d: 11, h: 19, min: 0)
         let store = makeStore(baseDate: base)
-        XCTAssertEqual(store.twelveHour(for: base, in: utc), "7:00 pm")
+        XCTAssertEqual(store.twelveHour(for: base, in: utc), "07:00PM")
     }
 
     // MARK: - Menu bar stays live
