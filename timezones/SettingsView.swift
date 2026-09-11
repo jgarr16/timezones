@@ -135,44 +135,38 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
                         .help("Type to filter the time zone list below")
-                    HStack(spacing: 6) {
-                        Picker("Time zone", selection: $newTZ) {
-                            ForEach(filteredTZIDs, id: \.self) { tz in
-                                Text(tz).tag(tz)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .font(.system(size: 12))
-                        .frame(maxWidth: .infinity)
-                        .help("Pick an IANA time zone")
-                    }
                     if !filteredTZIDs.isEmpty {
                         Text("\(filteredTZIDs.count) matches\(filteredTZIDs.count > 50 ? " - showing first 50, refine search" : ""). Selected: \(newTZ)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
-                        VStack(spacing: 2) {
-                            ForEach(pickerVisibleIDs, id: \.self) { tz in
-                                Button {
-                                    newTZ = tz
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: newTZ == tz ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(newTZ == tz ? Color.accentColor : Color.secondary)
-                                            .font(.system(size: 11))
-                                        Text(tz)
-                                            .font(.system(size: 12).monospacedDigit())
-                                            .foregroundStyle(.primary)
-                                        Spacer()
+                        ScrollView {
+                            LazyVStack(spacing: 2) {
+                                ForEach(pickerVisibleIDs, id: \.self) { tz in
+                                    Button {
+                                        newTZ = tz
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: newTZ == tz ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(newTZ == tz ? Color.accentColor : Color.secondary)
+                                                .font(.system(size: 11))
+                                            Text(tz)
+                                                .font(.system(size: 12).monospacedDigit())
+                                                .foregroundStyle(.primary)
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(newTZ == tz ? Color.accentColor.opacity(0.12) : Color.clear)
+                                        .clipShape(RoundedRectangle(cornerRadius: 5))
                                     }
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(newTZ == tz ? Color.accentColor.opacity(0.12) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(2)
                         }
-                        .frame(maxHeight: 140)
+                        .frame(height: 140)
+                        .background(Color(nsColor: .textBackgroundColor).opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
