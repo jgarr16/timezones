@@ -1253,7 +1253,33 @@ final class TimeStore: ObservableObject {
     }
 
     var clipboardText: String {
-        zones.filter { copySelectedIDs.contains($0.id) }.map { copySentence(for: $0) }.joined(separator: "\n")
+        paddedCopyLines().joined(separator: "\n")
+    }
+
+    func paddedCopyLines() -> [String] {
+        let selected = zones.filter { copySelectedIDs.contains($0.id) }
+        if selected.isEmpty { return [] }
+        let tokens: [CopyToken] = copyOrder.isEmpty ? [.city, .date, .time12, .abbr] : copyOrder
+        let rows: [[String]] = selected.map { zone in
+            tokens.map { tokenString(for: $0, zone: zone) }
+        }
+        var widths = [Int](repeating: 0, count: tokens.count)
+        for row in rows {
+            for (i, s) in row.enumerated() {
+                widths[i] = max(widths[i], s.count)
+            }
+        }
+        return rows.map { row in
+            var parts: [String] = []
+            for (i, s) in row.enumerated() {
+                if i == row.count - 1 {
+                    parts.append(s)
+                } else {
+                    parts.append(s.padding(toLength: widths[i], withPad: " ", startingAt: 0))
+                }
+            }
+            return parts.joined(separator: " ")
+        }
     }
 
     func copyAllToClipboard() {
