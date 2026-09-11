@@ -28,7 +28,7 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
         case .monthYear: return "Month/Year (M/YYYY)"
         case .year2: return "Year (YY)"
         case .year4: return "Year (YYYY)"
-        case .time12: return "Time 12h (08:30AM)"
+        case .time12: return "Time 12h (8:30AM)"
         case .time24: return "Time 24h (08:30)"
         case .abbr: return "Abbreviation (KST)"
         case .offset: return "GMT offset (+9)"
@@ -45,7 +45,7 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
         case .monthYear: return "9/2026"
         case .year2: return "26"
         case .year4: return "2026"
-        case .time12: return "08:30AM"
+        case .time12: return "8:30AM"
         case .time24: return "08:30"
         case .abbr: return "(KST)"
         case .offset: return "+9"
@@ -1190,7 +1190,7 @@ final class TimeStore: ObservableObject {
         let f = DateFormatter()
         f.timeZone = timeZone
         f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "hh:mm a"
+        f.dateFormat = "h:mm a"
         return f.string(from: date).replacingOccurrences(of: " ", with: "").uppercased()
     }
 

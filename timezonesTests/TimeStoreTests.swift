@@ -90,7 +90,7 @@ final class TimeStoreTests: XCTestCase {
     func testCopyLineFormat() {
         let base = dateIn(seoul, y: 2026, m: 9, d: 11, h: 17, min: 0)
         let store = makeStore(baseDate: base)
-        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/11 05:00PM (KST)")
+        XCTAssertEqual(store.copyLine(for: seoulZone()), "Seoul 9/11 5:00PM (KST)")
     }
 
     func testCopySentenceHasNoHeresThe() {
@@ -188,6 +188,14 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Frankfurt"), "Europe/Berlin")
         XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "Frankfurt am Main"), "Europe/Berlin")
         XCTAssertEqual(TimeStore.suggestedTimeZoneID(forCity: "America/Chicago"), "America/Chicago")
+    }
+
+    func testTwelveHourHasNoLeadingZero() {
+        let base = dateIn(seoul, y: 2026, m: 9, d: 15, h: 9, min: 0)
+        let store = makeStore(baseDate: base)
+        XCTAssertEqual(store.twelveHour(for: base, in: seoul), "9:00AM")
+        let evening = dateIn(chicago, y: 2026, m: 9, d: 14, h: 19, min: 0)
+        XCTAssertEqual(store.twelveHour(for: evening, in: chicago), "7:00PM")
     }
 
     func testCustomZoneAddRemove() {
