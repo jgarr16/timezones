@@ -5,7 +5,6 @@ struct SettingsView: View {
     @State private var newCity: String = ""
     @State private var newTZ: String = "Europe/Berlin"
     @State private var tzSearch: String = ""
-    @State private var zoneFilter: String = ""
     @State private var addError: String = ""
     @State private var partToAdd: CopyToken = .time24
     @State private var presetName: String = ""
@@ -20,16 +19,6 @@ struct SettingsView: View {
 
     var pickerVisibleIDs: [String] {
         Array(filteredTZIDs.prefix(50))
-    }
-
-    var filteredCatalog: [ZoneDef] {
-        let q = zoneFilter.trimmingCharacters(in: .whitespacesAndNewlines)
-        if q.isEmpty { return store.allCatalog }
-        return store.allCatalog.filter { zone in
-            store.cityName(for: zone).localizedCaseInsensitiveContains(q) ||
-            zone.timeZone.identifier.localizedCaseInsensitiveContains(q) ||
-            zone.title.localizedCaseInsensitiveContains(q)
-        }
     }
 
     var availableTokensToAdd: [CopyToken] {
@@ -51,10 +40,6 @@ struct SettingsView: View {
                 Text("City names are shown on the left and in copies. Edit to rename. Unchecked zones are hidden.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                TextField("Search cities or zones (e.g. Chicago)", text: $zoneFilter)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
-                    .help("Filter the list below by city or zone ID")
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -71,7 +56,7 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                ForEach(filteredCatalog) { zone in
+                ForEach(store.allCatalog) { zone in
                     let selected = store.isSelected(id: zone.id)
                     let canSelect = selected || store.canAddMore()
                     HStack(spacing: 8) {
@@ -116,12 +101,6 @@ struct SettingsView: View {
                             }
                         }
                     }
-                }
-                if !zoneFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && filteredCatalog.isEmpty {
-                    Text("No cities match \"\(zoneFilter)\". Try a zone ID below.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Add your own city and time zone")
@@ -331,11 +310,11 @@ struct SettingsView: View {
                 Divider()
                 Text("Copy Presets")
                     .font(.system(size: 14, weight: .semibold))
-                Text("Save the current format under a name like Chris or Work, then apply with one click.")
+                Text("Save the current format under a name like Customers or Work, then apply with one click.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
-                    TextField("Preset name (e.g. Chris)", text: $presetName)
+                    TextField("Preset name (e.g. Work)", text: $presetName)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
                         .frame(maxWidth: .infinity)
