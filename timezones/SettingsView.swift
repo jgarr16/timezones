@@ -73,19 +73,20 @@ struct SettingsView: View {
                             .font(.system(size: 10).monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                        if store.isCustomZone(id: zone.id) {
+                            Button {
+                                store.removeCustomZone(id: zone.id)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Delete \(store.cityName(for: zone))")
+                        }
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .opacity(canSelect ? 1.0 : 0.4)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if store.isCustomZone(id: zone.id) {
-                            Button(role: .destructive) {
-                                store.removeCustomZone(id: zone.id)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
                     .contextMenu {
                         if store.isCustomZone(id: zone.id) {
                             Button(role: .destructive) {
@@ -132,7 +133,7 @@ struct SettingsView: View {
                         .controlSize(.small)
                         .disabled(!store.canAddMore() || newCity.trimmingCharacters(in: .whitespaces).isEmpty)
                         Spacer()
-                        Text("Custom zones support swipe-left to delete.")
+                        Text("Custom zones can be removed with the trash icon.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
