@@ -73,14 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // Prevent macOS from restoring Settings window from previous session.
-        // This is what made Settings persist on screen after relaunch.
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         closeLaunchWindowsNow()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
-        // Disable secure state restoration so detached windows do not come back.
         return false
     }
 
@@ -146,9 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func closeDetachedWindowAtLaunch() {
-        // The Window(id: main) Scene opens automatically on launch.
-        // We want menu-bar popover by default, detached only on demand.
-        // Hide with alpha 0 + orderOut to avoid animated flicker/blip.
         func closeLaunchWindows() {
             for window in NSApp.windows where window.title == "Timezones" || window.title == "Settings" {
                 window.alphaValue = 0
@@ -247,6 +241,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let presetsItem = NSMenuItem(title: "Presets", action: nil, keyEquivalent: "")
+        let presetsMenu = NSMenu()
+        if let store, !store.copyPresets.isEmpty {
+            for preset in store.copyPresets {
+                let cities = preset.zones.map { $0.city }.joined(separator: ", ")
+                let title = cities.isEmpty ? preset.name : "\(preset.name) - \(cities)"
+                let item = NSMenuItem(title: title, action: #selector(applyPreset(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = preset.id
+                item.toolTip = "Apply \(preset.name): restores cities and format"
+                presetsMenu.addItem(item)
+            }
+        } else {
+            let empty = NSMenuItem(title: "No presets yet", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            presetsMenu.addItem(empty)
+        }
+        menu.addItem(presetsItem)
+        menu.setSubmenu(presetsMenu, for: presetsItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         let detachedItem = NSMenuItem(title: "New Window", action: #selector(openDetachedWindow), keyEquivalent: "")
         detachedItem.target = self
         detachedItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: "New Window")
@@ -264,6 +280,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         menu.addItem(quitItem)
 
         return menu
+    }
+
+    @objc private func applyPreset(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        store?.applyCopyPreset(id: id)
+        store?.goLive()
     }
 
     @objc private func openDetachedWindow() {

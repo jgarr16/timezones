@@ -122,6 +122,35 @@ final class TimeStoreTests: XCTestCase {
         XCTAssertFalse(store.saveCopyPreset(name: "   "))
     }
 
+    func testCopyPresetSavesZones() {
+        let store = makeStore(baseDate: Date())
+        XCTAssertTrue(store.addCustomZone(city: "Austin", timeZoneID: "America/Chicago"))
+        XCTAssertTrue(store.addCustomZone(city: "Seoul", timeZoneID: "Asia/Seoul"))
+        store.copyOrder = [.city, .date, .time12]
+        XCTAssertTrue(store.saveCopyPreset(name: "Family"))
+        let preset = store.copyPresets.first(where: { $0.name == "Family" })!
+        XCTAssertEqual(preset.tokens, [.city, .date, .time12])
+        XCTAssertTrue(preset.zones.map { $0.city }.contains("Austin"))
+        XCTAssertTrue(preset.zones.map { $0.city }.contains("Seoul"))
+    }
+
+    func testCopyPresetApplyRestoresZonesAndFormat() {
+        let store = makeStore(baseDate: Date())
+        XCTAssertTrue(store.addCustomZone(city: "Austin", timeZoneID: "America/Chicago"))
+        XCTAssertTrue(store.addCustomZone(city: "Seoul", timeZoneID: "Asia/Seoul"))
+        store.copyOrder = [.city, .date, .time12]
+        XCTAssertTrue(store.saveCopyPreset(name: "Family"))
+        let presetID = store.copyPresets.first!.id
+        XCTAssertTrue(store.addCustomZone(city: "Beijing", timeZoneID: "Asia/Shanghai"))
+        store.copyOrder = [.date, .time24]
+        store.applyCopyPreset(id: presetID)
+        XCTAssertEqual(store.copyOrder, [.city, .date, .time12])
+        let cities = store.zones.map { store.cityName(for: $0) }
+        XCTAssertTrue(cities.contains("Austin"))
+        XCTAssertTrue(cities.contains("Seoul"))
+        XCTAssertFalse(cities.contains("Beijing"))
+    }
+
     func testCopyPresetOverwriteSameName() {
         let store = makeStore(baseDate: Date())
         store.copyOrder = [.city, .date]

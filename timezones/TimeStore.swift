@@ -53,10 +53,49 @@ enum CopyToken: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+struct PresetZoneEntry: Codable, Hashable {
+    var city: String
+    var timeZoneID: String
+    var isCopySelected: Bool
+
+    static let localID = "__local__"
+}
+
 struct CopyPreset: Codable, Hashable, Identifiable {
     var id: String
     var name: String
     var tokens: [CopyToken]
+    var zones: [PresetZoneEntry]
+
+    init(id: String, name: String, tokens: [CopyToken], zones: [PresetZoneEntry] = []) {
+        self.id = id
+        self.name = name
+        self.tokens = tokens
+        self.zones = zones
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case tokens
+        case zones
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        tokens = try c.decode([CopyToken].self, forKey: .tokens)
+        zones = try c.decodeIfPresent([PresetZoneEntry].self, forKey: .zones) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(tokens, forKey: .tokens)
+        try c.encode(zones, forKey: .zones)
+    }
 }
 
 struct CustomZone: Codable, Hashable, Identifiable {
@@ -181,7 +220,6 @@ final class TimeStore: ObservableObject {
     static let defaultExtras: [String] = []
     static let defaultCopyOrder: [CopyToken] = [.city, .date, .time12, .abbr]
 
-    // MARK: - City to time zone guessing (offline, on the fly)
     static let cityTimeZoneMap: [String: String] = [
         "austin": "America/Chicago",
         "dallas": "America/Chicago",
@@ -878,23 +916,95 @@ final class TimeStore: ObservableObject {
         return enabled + disabled
     }
 
+    func snapshotZonesForPreset() -> [PresetZoneEntry] {
+        zones.map { zone in
+            if zone.id == "local" {
+                return PresetZoneEntry(city: cityName(for: zone), timeZoneID: PresetZoneEntry.localID, isCopySelected: copySelectedIDs.contains(zone.id))
+            } else {
+                return PresetZoneEntry(city: cityName(for: zone), timeZoneID: zone.timeZone.identifier, isCopySelected: copySelectedIDs.contains(zone.id))
+            }
+        }
+    }
+
     func saveCopyPreset(name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         guard !copyOrder.isEmpty else { return false }
+        let snapshot = snapshotZonesForPreset()
         if let idx = copyPresets.firstIndex(where: { $0.name.lowercased() == trimmed.lowercased() }) {
             copyPresets[idx].tokens = copyOrder
+            copyPresets[idx].zones = snapshot
         } else {
-            let p = CopyPreset(id: "preset-" + UUID().uuidString.prefix(8).lowercased(), name: trimmed, tokens: copyOrder)
+            let p = CopyPreset(id: "preset-" + UUID().uuidString.prefix(8).lowercased(), name: trimmed, tokens: copyOrder, zones: snapshot)
             copyPresets.append(p)
         }
         return true
     }
 
     func applyCopyPreset(id: String) {
-        if let p = copyPresets.first(where: { $0.id == id }) {
-            copyOrder = p.tokens
+        guard let p = copyPresets.first(where: { $0.id == id }) else { return }
+        copyOrder = p.tokens
+        if !p.zones.isEmpty {
+            applyPresetZones(p.zones)
         }
+    }
+
+    func applyPresetZones(_ entries: [PresetZoneEntry]) {
+        var newExtraIDs: [String] = []
+        var newCopy = Set<String>()
+        for entry in entries {
+            if entry.timeZoneID == PresetZoneEntry.localID {
+                let cityTrim = entry.city.trimmingCharacters(in: .whitespacesAndNewlines)
+                if cityTrim.isEmpty || cityTrim.lowercased() == "local" {
+                    customCities.removeValue(forKey: "local")
+                } else {
+                    customCities["local"] = cityTrim
+                }
+                if entry.isCopySelected {
+                    newCopy.insert("local")
+                }
+            }
+        }
+        for entry in entries where entry.timeZoneID != PresetZoneEntry.localID {
+            guard TimeZone(identifier: entry.timeZoneID) != nil else { continue }
+            var matchedID: String?
+            for cz in customZones {
+                if cz.timeZoneID == entry.timeZoneID {
+                    let resolved: String
+                    if let custom = customCities[cz.id]?.trimmingCharacters(in: .whitespacesAndNewlines), !custom.isEmpty {
+                        resolved = custom
+                    } else {
+                        resolved = cz.city
+                    }
+                    if resolved.lowercased() == entry.city.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                        matchedID = cz.id
+                        break
+                    }
+                }
+            }
+            if matchedID == nil {
+                if newExtraIDs.count >= Self.maxExtras { continue }
+                let newID = "custom-" + UUID().uuidString.prefix(8).lowercased()
+                let cz = CustomZone(id: String(newID), city: entry.city, timeZoneID: entry.timeZoneID)
+                customZones.append(cz)
+                matchedID = cz.id
+            }
+            if let mid = matchedID {
+                if !newExtraIDs.contains(mid) {
+                    newExtraIDs.append(mid)
+                }
+                if let cz = customZones.first(where: { $0.id == mid }) {
+                    if cz.city != entry.city {
+                        customCities[mid] = entry.city
+                    }
+                }
+                if entry.isCopySelected {
+                    newCopy.insert(mid)
+                }
+            }
+        }
+        extraIDs = Array(newExtraIDs.prefix(Self.maxExtras))
+        copySelectedIDs = newCopy
     }
 
     func deleteCopyPreset(id: String) {

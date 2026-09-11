@@ -313,6 +313,9 @@ struct SettingsView: View {
                 Text("Save the current format under a name like Customers or Work, then apply with one click.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                Text("Presets save format plus cities, zones, and copy checks.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
                     TextField("Preset name (e.g. Work)", text: $presetName)
                         .textFieldStyle(.roundedBorder)
@@ -342,44 +345,50 @@ struct SettingsView: View {
                     VStack(spacing: 2) {
                         ForEach(store.copyPresets) { preset in
                             let isActive = store.copyOrder == preset.tokens
-                            HStack(spacing: 8) {
-                                Button("Apply") {
-                                    store.applyCopyPreset(id: preset.id)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 8) {
+                                    Button("Apply") {
+                                        store.applyCopyPreset(id: preset.id)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .help("Apply preset \(preset.name) - restores format and cities")
+                                    Button {
+                                        store.applyCopyPreset(id: preset.id)
+                                    } label: {
+                                        Text(preset.name)
+                                            .font(.system(size: 12, weight: .medium))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Apply preset \(preset.name) - restores format and cities")
+                                    if isActive {
+                                        Text("Active")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.accentColor)
+                                            .clipShape(Capsule())
+                                    }
+                                    Spacer()
+                                    Button {
+                                        store.deleteCopyPreset(id: preset.id)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Delete preset")
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                .help("Apply preset \(preset.name)")
-                                Button {
-                                    store.applyCopyPreset(id: preset.id)
-                                } label: {
-                                    Text(preset.name)
-                                        .font(.system(size: 12, weight: .medium))
-                                }
-                                .buttonStyle(.plain)
-                                .help("Apply preset \(preset.name)")
-                                if isActive {
-                                    Text("Active")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                                Spacer()
+                                Text(preset.zones.map { $0.city }.joined(separator: ", "))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                                 Text(preset.tokens.map { $0.example }.joined(separator: " "))
                                     .font(.system(size: 10).monospacedDigit())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
-                                Button {
-                                    store.deleteCopyPreset(id: preset.id)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                                .help("Delete preset")
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
