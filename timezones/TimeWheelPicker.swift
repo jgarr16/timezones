@@ -31,10 +31,10 @@ struct TimeWheelPicker: View {
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Color(nsColor: .textBackgroundColor))
+                        .fill(Color(nsColor: .textBackgroundColor).opacity(0.35))
                         .overlay(
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(focusedField == .hour ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                                .stroke(focusedField == .hour ? Color.accentColor.opacity(0.4) : Color.gray.opacity(0.15), lineWidth: 1)
                         )
                 )
                 .help("Hour 0-23 (Up/Down to step 1h)")
@@ -72,10 +72,10 @@ struct TimeWheelPicker: View {
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Color(nsColor: .textBackgroundColor))
+                        .fill(Color(nsColor: .textBackgroundColor).opacity(0.35))
                         .overlay(
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(focusedField == .minute ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                                .stroke(focusedField == .minute ? Color.accentColor.opacity(0.4) : Color.gray.opacity(0.15), lineWidth: 1)
                         )
                 )
                 .help("Minute (Up/Down snaps to 0/30 then 30min steps)")

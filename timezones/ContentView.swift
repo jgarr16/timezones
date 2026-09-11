@@ -18,11 +18,11 @@ struct ContentView: View {
                             .foregroundStyle(store.isCopySelected(id: zone.id) ? Color.accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("Include in Copy All")
+                    .help("Include in Copy Selected")
                     .frame(width: 18)
                     Text(store.cityName(for: zone))
                         .font(.system(size: 13))
-                        .frame(width: 70, alignment: .leading)
+                        .frame(width: 110, alignment: .leading)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     DateField(
@@ -66,7 +66,7 @@ struct ContentView: View {
                     Text(zone.abbreviation(for: store.baseDate))
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .trailing)
+                        .frame(width: 40, alignment: .trailing)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 8)
@@ -87,14 +87,14 @@ struct ContentView: View {
                 .disabled(store.isLive)
                 .frame(width: 60, alignment: .leading)
                 Spacer()
-                Button(didCopy ? "Copied!" : "Copy All") {
+                Button(didCopy ? "Copied!" : "Copy Selected") {
                     copyAll()
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
-                .frame(width: 70)
+                .frame(width: 90)
                 .keyboardShortcut("m", modifiers: .command)
-                .help("Copy checked rows, one per line (Cmd+M)")
+                .help("Copy selected rows, one per line (Cmd+M)")
                 Spacer()
                 Button("Settings") {
                     openWindow(id: "settings")
@@ -109,7 +109,7 @@ struct ContentView: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .frame(width: 380)
+        .frame(width: 430)
     }
 
     private func copyAll() {

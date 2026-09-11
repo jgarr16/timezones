@@ -28,10 +28,10 @@ struct DateField: View {
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Color(nsColor: .textBackgroundColor))
+                        .fill(Color(nsColor: .textBackgroundColor).opacity(0.35))
                         .overlay(
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(focusedField == .month ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                                .stroke(focusedField == .month ? Color.accentColor.opacity(0.4) : Color.gray.opacity(0.15), lineWidth: 1)
                         )
                 )
                 .help("Month in this zone (Up/Down to step)")
@@ -74,10 +74,10 @@ struct DateField: View {
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Color(nsColor: .textBackgroundColor))
+                        .fill(Color(nsColor: .textBackgroundColor).opacity(0.35))
                         .overlay(
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(focusedField == .day ? Color.accentColor.opacity(0.7) : Color.gray.opacity(0.25), lineWidth: 1)
+                                .stroke(focusedField == .day ? Color.accentColor.opacity(0.4) : Color.gray.opacity(0.15), lineWidth: 1)
                         )
                 )
                 .help("Day in this zone (Up/Down to step)")
